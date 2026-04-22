@@ -1,4 +1,4 @@
-"""Core SSA correctness tests for ``run_gillespie_loop``.
+"""Tests for ``crn_jax.gillespie`` — the SSA driver and its wrappers.
 
 These tests intentionally avoid any domain-specific scaffolding — they use a
 plain NamedTuple birth-death process defined in ``conftest.py``.
@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from crn_jax import run_gillespie_loop
+from crn_jax.gillespie import simulate_interval, simulate_until
 
 from .conftest import (
     BirthDeathState,
@@ -21,7 +21,7 @@ from .conftest import (
 
 
 def _run_to(state: BirthDeathState, key, action, target_time, max_steps=10_000):
-    return run_gillespie_loop(
+    return simulate_until(
         key=key,
         initial_state=state,
         action=action,
@@ -140,7 +140,7 @@ def test_max_steps_is_respected():
     action = jnp.array([1000.0, 1000.0])
     s0 = initial_state(x0=50.0)
 
-    result = run_gillespie_loop(
+    result = simulate_until(
         key=key,
         initial_state=s0,
         action=action,
@@ -175,7 +175,7 @@ def test_action_change_invalidates_pending_time():
     s_seeded = s0._replace(next_reaction_time=jnp.array(0.5))
 
     def run(prev):
-        return run_gillespie_loop(
+        return simulate_until(
             key=key,
             initial_state=s_seeded,
             action=action,
@@ -198,14 +198,14 @@ def test_action_change_invalidates_pending_time():
 
 
 def test_jit_compiles_and_runs():
-    """``run_gillespie_loop`` must compile under ``jax.jit`` when ``max_steps``
+    """``simulate_until`` must compile under ``jax.jit`` when ``max_steps``
     is treated as a static int."""
     action = jnp.array([1.0, 0.1])
     s0 = initial_state()
 
     @jax.jit
     def run(key, state, action):
-        return run_gillespie_loop(
+        return simulate_until(
             key=key,
             initial_state=state,
             action=action,
@@ -257,3 +257,76 @@ def test_vmap_parallel_different_parameters():
     # Higher birth rate ⇒ higher mean X (monotone trend at 50 min).
     # Not a sharp test (stochastic) but the extremes should differ.
     assert float(jnp.mean(xs[-4:])) > float(jnp.mean(xs[:4]))
+
+
+# --- simulate_interval wrapper ---------------------------------------------------
+
+
+def test_simulate_interval_advances_time():
+    """After one interval of length 5, state.time should be ≤ 5 and
+    next_reaction_time should be ≥ 5."""
+    key = jax.random.PRNGKey(0)
+    action = jnp.array([1.0, 0.1])
+    s0 = initial_state()
+
+    s1 = simulate_interval(
+        key=key,
+        state=s0,
+        action=action,
+        timestep=5.0,
+        max_steps=1_000,
+        compute_propensities_fn=birth_death_propensities,
+        apply_reaction_fn=birth_death_apply,
+    )
+    assert float(s1.time) <= 5.0
+    assert float(s1.next_reaction_time) >= 5.0
+
+
+def test_simulate_interval_chain_matches_distribution():
+    """Chaining ``simulate_interval`` calls should reproduce the marginal at T."""
+    action = jnp.array([1.5, 0.1])
+    T = 20.0
+
+    def chained(key):
+        state = initial_state()
+        for i in range(4):
+            key, sub = jax.random.split(key)
+            state = simulate_interval(
+                key=sub,
+                state=state,
+                action=action,
+                timestep=T / 4,
+                max_steps=2_000,
+                compute_propensities_fn=birth_death_propensities,
+                apply_reaction_fn=birth_death_apply,
+                interval_start=jnp.array(i * T / 4),
+            )
+        return state.x
+
+    keys = jax.random.split(jax.random.PRNGKey(0), 200)
+    xs = jax.vmap(chained)(keys)
+    # Steady state mean ≈ 1.5 / 0.1 = 15; at T=20 we haven't fully equilibrated,
+    # but should be in the plausible band.
+    mean = float(jnp.mean(xs))
+    assert 5.0 < mean < 25.0
+
+
+def test_simulate_interval_jits():
+    """The wrapper should compile under jit just like the core function."""
+    action = jnp.array([1.0, 0.1])
+    s0 = initial_state()
+
+    @jax.jit
+    def one_step(key, state):
+        return simulate_interval(
+            key=key,
+            state=state,
+            action=action,
+            timestep=2.0,
+            max_steps=500,
+            compute_propensities_fn=birth_death_propensities,
+            apply_reaction_fn=birth_death_apply,
+        )
+
+    s = one_step(jax.random.PRNGKey(0), s0)
+    assert jnp.isfinite(s.x)

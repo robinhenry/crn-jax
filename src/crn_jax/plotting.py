@@ -7,13 +7,14 @@ with ``pip install crn-jax[examples]`` pulls it in.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 from jax import Array
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 
 def plot_trajectories(
@@ -26,7 +27,7 @@ def plot_trajectories(
     title: str | None = None,
     color: str = "tab:blue",
     alpha: float | None = None,
-) -> "Axes":
+) -> "tuple[Figure, Axes]":
     """Plot one or more Gillespie trajectories sharing a time axis.
 
     Uses step plotting (``where="post"``) to faithfully reflect the
@@ -44,7 +45,9 @@ def plot_trajectories(
             trajectory and ``max(0.2, 1/N)`` for an ensemble.
 
     Returns:
-        The matplotlib ``Axes`` the trajectories were drawn into.
+        ``(fig, ax)`` — the matplotlib ``Figure`` and ``Axes`` the
+        trajectories were drawn into. When ``ax`` is supplied, ``fig`` is
+        ``ax.figure``.
     """
     import matplotlib.pyplot as plt  # noqa: PLC0415 — lazy optional dep
 
@@ -57,7 +60,9 @@ def plot_trajectories(
     n, _ = x.shape
 
     if ax is None:
-        _, ax = plt.subplots(figsize=(6, 4))
+        fig, ax = plt.subplots(figsize=(6, 4))
+    else:
+        fig = ax.figure
     if alpha is None:
         alpha = 1.0 if n == 1 else max(0.2, 1.0 / n)
 
@@ -68,4 +73,4 @@ def plot_trajectories(
     ax.set_ylabel(ylabel)
     if title is not None:
         ax.set_title(title)
-    return ax
+    return fig, ax

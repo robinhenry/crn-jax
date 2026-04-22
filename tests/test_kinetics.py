@@ -1,4 +1,4 @@
-"""Tests for the small extras module (``hill_function``, ``sample_lognormal``)."""
+"""Tests for the kinetics module (``hill_function``, ``sample_lognormal``)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from crn_jax.extras import hill_function, sample_lognormal
+from crn_jax.kinetics import hill_function, sample_lognormal
 
 
 def test_hill_at_K_is_half():

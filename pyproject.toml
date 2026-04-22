@@ -1,7 +1,7 @@
 [project]
 name = "crn-jax"
 version = "0.1.0"
-description = "Chemical reaction networks in JAX: GPU-parallel stochastic simulation (Gillespie SSA today, τ-leaping / CLE / next-reaction on the roadmap)."
+description = "Chemical reaction networks in JAX: GPU-parallel stochastic simulations."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -17,18 +17,6 @@ keywords = [
     "systems-biology",
     "gpu",
 ]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
-    "Topic :: Scientific/Engineering :: Chemistry",
-]
 dependencies = [
     "jax>=0.4.20",
 ]
@@ -41,6 +29,9 @@ test = [
 examples = [
     "matplotlib>=3.7",
     "numpy>=1.24",
+]
+dev = [
+    "ruff>=0.6",
 ]
 
 [project.urls]
@@ -56,6 +47,23 @@ packages = ["src/crn_jax"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E731"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["crn_jax"]

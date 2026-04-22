@@ -1,136 +1,97 @@
 # crn-jax
 
-Chemical reaction networks in JAX — a tiny, GPU-parallel Stochastic
-Simulation Algorithm (SSA) library.
-
-> **Status:** `0.1.0` — Gillespie SSA only. τ-leaping, next-reaction method,
-> and a Chemical Langevin Equation driver are on the roadmap below.
-
-```python
-import jax, jax.numpy as jnp
-from typing import NamedTuple
-from crn_jax import run_gillespie_loop
-
-class State(NamedTuple):
-    time: jax.Array
-    x: jax.Array
-
-def propensities(s, action):                 # [birth, death]
-    return jnp.array([1.0, 0.1 * s.x])
-
-def apply_reaction(s, j):
-    return s._replace(x=s.x + jnp.where(j == 0, 1.0, -1.0))
-
-state = State(time=jnp.array(0.0), x=jnp.array(0.0))
-final, _ = run_gillespie_loop(
-    key=jax.random.PRNGKey(0),
-    initial_state=state,
-    action=jnp.array(0.0),
-    target_time=100.0,
-    max_steps=10_000,
-    compute_propensities_fn=propensities,
-    apply_reaction_fn=apply_reaction,
-    get_time_fn=lambda s: s.time,
-    update_time_fn=lambda s, t: s._replace(time=t),
-)
-print(int(final.x))                          # ~10 at steady state
-```
-
-That's the entire public API for running a simulation. Everything else is
-optional sugar.
-
-## What this package is (and isn't)
-
-`crn-jax` is a **pure-JAX implementation of exact stochastic simulation** for
-chemical reaction networks. The core loop:
-
-- compiles under `jax.jit`,
-- parallelises under `jax.vmap` (1 000+ independent trajectories on a single
-  GPU, with no Python overhead per step),
-- preserves pending reaction times across simulation-interval boundaries, so
-  trajectories are physically correct under RL-style discretisation.
-
-It is deliberately **not**:
-
-- a full systems-biology framework (no ODE integrators, no stoichiometry DSL,
-  no visualisation — those are library concerns, not algorithm concerns),
-- a replacement for `gillespy2`, `StochSS`, `COPASI`, etc. if you want a
-  batteries-included workflow on CPU.
-
-The target audience is researchers who already use JAX and want an SSA
-primitive they can drop into their own models.
+Chemical reaction networks in JAX — a tiny, GPU-parallel Gillespie / Stochastic Simulation Algorithm (SSA) library.
 
 ## Install
 
 ```bash
-pip install crn-jax                 # once published
+pip install crn-jax
 # or, from source:
 pip install git+https://github.com/robinhenry/crn-jax
 # for local development:
 git clone https://github.com/robinhenry/crn-jax && cd crn-jax && pip install -e ".[test,examples]"
 ```
 
-Depends on `jax` / `jaxlib` only.
+Depends on `jax` / `jaxlib` only. `matplotlib` is pulled in via the `examples` extra for the plotting helper.
 
-## API surface
+## Quickstart
+
+A 1-species birth-death process, `∅ → X` at rate λ and `X → ∅` at rate μ·x, simulated for 10 independent replicates and plotted:
 
 ```python
-from crn_jax import run_gillespie_loop          # core SSA driver
-from crn_jax.extras import hill_function, sample_lognormal
-from crn_jax.templates import step_interval      # fixed-dt RL-style wrapper
+from typing import NamedTuple
+import jax, jax.numpy as jnp
+from crn_jax import simulate_trajectory, plot_trajectories
+
+BIRTH_RATE, DEATH_RATE = 3.0, 0.1    # steady-state mean λ/μ = 30
+
+class State(NamedTuple):
+    time: jax.Array
+    x: jax.Array
+    next_reaction_time: jax.Array    # carried across intervals
+
+def propensities(s, _action):
+    return jnp.array([BIRTH_RATE, DEATH_RATE * s.x])
+
+def apply_reaction(s, j):
+    return s._replace(x=s.x + jnp.where(j == 0, 1.0, -1.0))
+
+state0 = State(jnp.array(0.0), jnp.array(0.0), jnp.array(jnp.inf))
+
+@jax.jit
+@jax.vmap
+def run_one(key):
+    return simulate_trajectory(
+        key=key,
+        initial_state=state0,
+        timestep=1.0,
+        n_steps=200,
+        compute_propensities_fn=propensities,
+        apply_reaction_fn=apply_reaction,
+    )
+
+states = run_one(jax.random.split(jax.random.PRNGKey(0), 10))
+times = jnp.arange(1, 201) * 1.0
+
+fig, ax = plot_trajectories(times, states.x, ylabel="X (molecules)")
+ax.axhline(BIRTH_RATE / DEATH_RATE, color="k", ls="--", label="λ/μ")
+fig.savefig("birth_death.png")
 ```
 
-### `run_gillespie_loop(key, initial_state, action, target_time, max_steps, compute_propensities_fn, apply_reaction_fn, get_time_fn, update_time_fn, pending_reaction_time=None, previous_action=None)`
+See the [examples](examples/) folder for the full version plus an optogenetic Hill-regulated gene-expression demo with per-replicate action schedules.
 
-Advances a state forward to `target_time` under the exact Gillespie SSA.
-Returns `(final_state, next_reaction_time)`.
+## Key features
 
-You supply:
+- **Exact SSA** — pure-JAX implementation of the Gillespie algorithm for chemical reaction networks.
+- **JIT-compiled** — the entire loop compiles under `jax.jit`.
+- **GPU-parallel** — 1 000+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead per step.
+- **Discretisation-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under RL-style stepping.
+- **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
-| callable | signature | what it does |
-|---|---|---|
-| `compute_propensities_fn` | `(state, action) -> Array[M]` | non-negative reaction rates |
-| `apply_reaction_fn` | `(state, reaction_idx) -> state` | applies reaction `j` |
-| `get_time_fn` | `state -> Array` | reads scalar time |
-| `update_time_fn` | `(state, time) -> state` | writes scalar time |
+## API
 
-The state object is whatever you want — a NamedTuple, a Flax struct dataclass,
-an Equinox module, a plain PyTree. The loop never inspects its contents.
+```python
+# Main entry point: scan n_steps fixed-length intervals, stack the per-step states.
+from crn_jax import simulate_trajectory
 
-See the [examples](examples/) folder for worked 1-species, opto-Hill, and
-parallel-parameter-sweep demos.
+# Finer control: one interval at a time (RL-style), or until an absolute time.
+from crn_jax.gillespie import simulate_interval, simulate_until
 
-## Examples
+# Plotting helper: step-plots a single trajectory or an (N, T) ensemble.
+from crn_jax import plot_trajectories
 
-```bash
-pip install -e ".[examples]"
-python examples/01_birth_death.py
-python examples/02_opto_hill_1d.py
-python examples/03_vmap_parameter_sweep.py
-python examples/04_step_interval.py
+# Optional kinetic-law helpers.
+from crn_jax.kinetics import hill_function, sample_lognormal
 ```
 
-## Roadmap
+| function              | when to reach for it                                                          |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `simulate_trajectory` | You want a full trajectory on a fixed sampling grid. Start here.              |
+| `simulate_interval`   | You're driving the system yourself, one step at a time (e.g. an RL rollout).  |
+| `simulate_until`      | You need a custom state shape or a non-uniform time grid. Fully generic.      |
+| `plot_trajectories`   | Quick look at the output.                                                     |
 
-The package name is `crn-jax` (chemical reaction networks) rather than
-`gillespie-jax` because the natural next additions to the library are:
-
-- `crn_jax.tau_leap.run_tau_leap_loop` — approximate SSA for stiff regimes.
-- `crn_jax.next_reaction.run_anderson_loop` — Anderson's modified
-  next-reaction method.
-- `crn_jax.cle.run_cle_loop` — Chemical Langevin Equation via
-  Euler-Maruyama (continuous diffusion approximation).
-- `crn_jax.network.Stoichiometry` — convenience object for building large
-  reaction networks from a stoichiometry matrix + rate-law callables.
-
-These will land behind feature flags rather than as breaking API changes.
-
-## Citing
-
-If you use this in academic work, please cite the original Gillespie paper:
-
-> Gillespie, D. T. (1977). *Exact stochastic simulation of coupled chemical
-> reactions.* **Journal of Physical Chemistry**, 81(25), 2340-2361.
+`simulate_trajectory` and `simulate_interval` assume the state exposes `time`, `next_reaction_time`, and a `_replace` method (`NamedTuple`, Flax struct dataclass, Equinox module, …). `simulate_until` has no such requirement — you pass `get_time_fn` / `update_time_fn` callbacks instead.
 
 ## License
 
