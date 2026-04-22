@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from crn_jax.kinetics import hill_function, sample_lognormal
 
