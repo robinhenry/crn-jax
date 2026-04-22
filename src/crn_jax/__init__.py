@@ -38,8 +38,9 @@ Quickstart
 """
 
 from .core import run_gillespie_loop
+from .plotting import plot_trajectories
 from .types import PRNGKey
 
-__all__ = ["run_gillespie_loop", "PRNGKey"]
+__all__ = ["run_gillespie_loop", "plot_trajectories", "PRNGKey"]
 
 __version__ = "0.1.0"

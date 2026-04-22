@@ -37,11 +37,6 @@ simulation-interval boundaries. Specifically:
   is invalidated (propensities have changed and the old schedule is stale).
 - When the state changes because a reaction occurred, a fresh :math:`\\tau` is
   sampled automatically inside the loop.
-
-Reference
----------
-Gillespie, D. T. (1977). "Exact stochastic simulation of coupled chemical
-reactions." *The Journal of Physical Chemistry*, 81(25), 2340-2361.
 """
 
 from typing import Any, Callable

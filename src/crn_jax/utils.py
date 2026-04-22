@@ -1,11 +1,4 @@
-"""Small helpers that are useful for stochastic reaction-network modelling.
-
-These are *optional*: :func:`crn_jax.run_gillespie_loop` does not import them.
-They live here so that users writing bio / systems-biology models don't have
-to re-derive common primitives.
-"""
-
-from __future__ import annotations
+"""Small helpers that are useful for stochastic reaction-network modelling"""
 
 import jax
 import jax.numpy as jnp
@@ -45,28 +38,14 @@ def hill_function(
 
     Formula: ``x**n / (K**n + x**n)``.
 
-    The Hill equation models sigmoidal responses in biological systems —
-    commonly gene regulation, enzyme kinetics, and receptor binding. It is
-    frequently used inside propensity functions passed to
-    :func:`crn_jax.run_gillespie_loop`.
-
     Args:
         x: Input concentration (molecules, arbitrary units).
-        K: Half-maximal concentration (``EC50`` / ``IC50``). At ``x == K`` the
+        K: Half-maximal concentration. At ``x == K`` the
             output is ``0.5``.
         n: Hill coefficient.
-
-            * ``n > 1``: positive cooperativity (sigmoidal, ultrasensitive).
-            * ``n == 1``: non-cooperative (hyperbolic, Michaelis-Menten).
-            * ``n < 1``: negative cooperativity (gradual response).
-
+    
     Returns:
         Hill-function value in ``[0, 1]``.
-
-    Examples:
-        >>> from crn_jax.extras import hill_function
-        >>> hill_function(x=100.0, K=90.0, n=3.6)
-        Array(0.57..., dtype=float32)
     """
     x_powered = jnp.power(x, n)
     K_powered = jnp.power(K, n)
