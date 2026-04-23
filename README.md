@@ -1,6 +1,12 @@
 # crn-jax
 
-Chemical reaction networks in JAX — a tiny, GPU-parallel Gillespie / Stochastic Simulation Algorithm (SSA) library.
+[![CI](https://github.com/robinhenry/crn-jax/actions/workflows/ci.yml/badge.svg)](https://github.com/robinhenry/crn-jax/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/crn-jax.svg)](https://pypi.org/project/crn-jax/)
+[![Python](https://img.shields.io/pypi/pyversions/crn-jax.svg)](https://pypi.org/project/crn-jax/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+Chemical reaction networks in JAX — a tiny, GPU-optimized Gillespie / Stochastic Simulation Algorithm (SSA) library.
 
 <p align="center">
   <picture>

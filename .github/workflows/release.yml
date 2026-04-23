@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write  # Required for PyPI trusted publishing
+
+jobs:
+  pre-release-checks:
+    name: Pre-release checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run full test suite
+        run: poetry run pytest tests/ -v --tb=short
+
+      - name: Verify version matches tag
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          echo "Git tag: $TAG_VERSION"
+          PACKAGE_VERSION=$(poetry version -s)
+          echo "Package version: $PACKAGE_VERSION"
+
+  build-dist:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    needs: pre-release-checks
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for poetry-dynamic-versioning
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install poetry-dynamic-versioning plugin
+        run: poetry self add "poetry-dynamic-versioning[plugin]"
+
+      - name: Build package
+        run: poetry build
+
+      - name: Verify package
+        run: |
+          poetry run pip install twine
+          poetry run twine check dist/*
+          ls -lh dist/
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          retention-days: 7
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: build-dist
+    environment:
+      name: pypi
+      url: https://pypi.org/project/crn-jax/
+    permissions:
+      id-token: write  # Required for PyPI trusted publishing
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          verbose: true
+
+  github-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: [build-dist, publish-pypi]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - name: Generate release notes
+        id: generate-notes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.version }}"
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
+
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Changes since $PREV_TAG:" > release_notes.md
+            echo "" >> release_notes.md
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" >> release_notes.md
+          else
+            echo "Initial release" > release_notes.md
+          fi
+
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.generate-notes.outputs.TAG_NAME }}
+          name: Release ${{ steps.generate-notes.outputs.TAG_NAME }}
+          body_path: release_notes.md
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
