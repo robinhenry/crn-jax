@@ -2,17 +2,31 @@
 
 Chemical reaction networks in JAX — a tiny, GPU-parallel Gillespie / Stochastic Simulation Algorithm (SSA) library.
 
+<p align="center">
+  <picture align="center">
+    <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/throughput_speedup_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="benchmarks/figures/throughput_speedup.svg">
+    <img alt="Gillespie SSA throughput: crn-jax on GPU vs GillesPy2 (C++) on CPU." src="benchmarks/figures/throughput_speedup.svg">
+  </picture>
+</p>
+
+<p align="center">
+  <i>Wall-time to simulate 1&nbsp;000&nbsp;000 Gillespie trajectories (CPU vs RTX 5090 GPU).</i>
+</p>
+
 ## Install
 
 ```bash
 pip install crn-jax
+# with NVIDIA GPU support:
+pip install "crn-jax[cuda]"
 # or, from source:
 pip install git+https://github.com/robinhenry/crn-jax
 # for local development:
 git clone https://github.com/robinhenry/crn-jax && cd crn-jax && pip install -e ".[test,examples]"
 ```
 
-Depends on `jax` / `jaxlib` only. `matplotlib` is pulled in via the `examples` extra for the plotting helper.
+`crn-jax` depends on `jax` / `jaxlib` only. 
 
 ## Quickstart
 
@@ -25,17 +39,22 @@ from crn_jax import simulate_trajectory, plot_trajectories
 
 BIRTH_RATE, DEATH_RATE = 3.0, 0.1    # steady-state mean λ/μ = 30
 
+# Define a state-holding object
 class State(NamedTuple):
     time: jax.Array
     x: jax.Array
     next_reaction_time: jax.Array    # carried across intervals
 
-def propensities(s, _action):
+# Return propensity equations as an array
+# with an optional input (unused here)
+def propensities(s, _input):
     return jnp.array([BIRTH_RATE, DEATH_RATE * s.x])
 
+# Describe how the state changes when reaction `j` fires
 def apply_reaction(s, j):
     return s._replace(x=s.x + jnp.where(j == 0, 1.0, -1.0))
 
+# Initial state
 state0 = State(jnp.array(0.0), jnp.array(0.0), jnp.array(jnp.inf))
 
 @jax.jit
@@ -46,27 +65,26 @@ def run_one(key):
         initial_state=state0,
         timestep=1.0,
         n_steps=200,
+        # Pass our 2 custom functions defined above
         compute_propensities_fn=propensities,
         apply_reaction_fn=apply_reaction,
     )
 
+# Simulate 10 Gillespie trajectories
 states = run_one(jax.random.split(jax.random.PRNGKey(0), 10))
 times = jnp.arange(1, 201) * 1.0
-
-fig, ax = plot_trajectories(times, states.x, ylabel="X (molecules)")
-ax.axhline(BIRTH_RATE / DEATH_RATE, color="k", ls="--", label="λ/μ")
-fig.savefig("birth_death.png")
 ```
 
-See the [examples](examples/) folder for the full version plus an optogenetic Hill-regulated gene-expression demo with per-replicate action schedules.
+See the [examples](examples/) folder for more detailed examples.
 
 ## Key features
 
-- **Exact SSA** — pure-JAX implementation of the Gillespie algorithm for chemical reaction networks.
-- **JIT-compiled** — the entire loop compiles under `jax.jit`.
-- **GPU-parallel** — 1 000+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead per step.
-- **Discretisation-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under RL-style stepping.
-- **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
+- 🎯 **Exact SSA** — pure-JAX implementation of the Gillespie algorithm for chemical reaction networks.
+- ⚡ **JIT-compiled** — the entire loop compiles under `jax.jit`.
+- 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
+- ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
+- 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
+- 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
 ## API
 
@@ -84,15 +102,16 @@ from crn_jax import plot_trajectories
 from crn_jax.kinetics import hill_function, sample_lognormal
 ```
 
-| function              | when to reach for it                                                          |
-| --------------------- | ----------------------------------------------------------------------------- |
-| `simulate_trajectory` | You want a full trajectory on a fixed sampling grid. Start here.              |
-| `simulate_interval`   | You're driving the system yourself, one step at a time (e.g. an RL rollout).  |
-| `simulate_until`      | You need a custom state shape or a non-uniform time grid. Fully generic.      |
-| `plot_trajectories`   | Quick look at the output.                                                     |
+| function              | when to reach for it                                                         |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `simulate_trajectory` | You want a full trajectory on a fixed sampling grid. Start here.             |
+| `simulate_interval`   | You're driving the system yourself, one step at a time (e.g. an RL rollout). |
+| `simulate_until`      | You need a custom state shape or a non-uniform time grid. Fully generic.     |
+| `plot_trajectories`   | Quick look at the output.                                                    |
 
 `simulate_trajectory` and `simulate_interval` assume the state exposes `time`, `next_reaction_time`, and a `_replace` method (`NamedTuple`, Flax struct dataclass, Equinox module, …). `simulate_until` has no such requirement — you pass `get_time_fn` / `update_time_fn` callbacks instead.
 
-## License
+## See Also
 
-MIT. See [LICENSE](LICENSE).
+* [GillesPy2](https://github.com/StochSS/GillesPy2): C++ optimized Gillespie simulations on CPU.
+* [myriad-jax](https://github.com/robinhenry/myriad-jax): RL-style decision making fully in JAX, powered by `grn-jax` at its core.

@@ -22,11 +22,11 @@ from .conftest import (
 )
 
 
-def _run_to(state: BirthDeathState, key, action, target_time, max_steps=10_000):
+def _run_to(state: BirthDeathState, key, input, target_time, max_steps=10_000):
     return simulate_until(
         key=key,
         initial_state=state,
-        action=action,
+        input=input,
         target_time=target_time,
         max_steps=max_steps,
         compute_propensities_fn=birth_death_propensities,
@@ -40,11 +40,11 @@ def _run_to(state: BirthDeathState, key, action, target_time, max_steps=10_000):
 def test_determinism_same_key_same_trajectory():
     """Same PRNG key ⇒ identical final state and pending time."""
     key = jax.random.PRNGKey(42)
-    action = jnp.array([1.0, 0.1])
+    input = jnp.array([1.0, 0.1])
     s0 = initial_state()
 
-    s1, t1 = _run_to(s0, key, action, target_time=20.0)
-    s2, t2 = _run_to(s0, key, action, target_time=20.0)
+    s1, t1 = _run_to(s0, key, input, target_time=20.0)
+    s2, t2 = _run_to(s0, key, input, target_time=20.0)
 
     assert jnp.array_equal(s1.x, s2.x)
     assert jnp.array_equal(s1.time, s2.time)
@@ -53,13 +53,13 @@ def test_determinism_same_key_same_trajectory():
 
 def test_different_keys_diverge():
     """Different keys ⇒ different trajectories (with overwhelming probability)."""
-    action = jnp.array([1.0, 0.1])
+    input = jnp.array([1.0, 0.1])
     s0 = initial_state()
 
     trajectories = []
     for seed in range(5):
         key = jax.random.PRNGKey(seed)
-        s, _ = _run_to(s0, key, action, target_time=50.0)
+        s, _ = _run_to(s0, key, input, target_time=50.0)
         trajectories.append(float(s.x))
 
     # With 5 independent seeds over a 50-minute window it is essentially
@@ -72,10 +72,10 @@ def test_final_time_at_or_past_target():
     that fired within the interval (≤ target_time), and next_reaction_time
     should be ≥ target_time."""
     key = jax.random.PRNGKey(0)
-    action = jnp.array([2.0, 0.05])
+    input = jnp.array([2.0, 0.05])
     s0 = initial_state(x0=10.0)
 
-    s, next_rxn_time = _run_to(s0, key, action, target_time=15.0)
+    s, next_rxn_time = _run_to(s0, key, input, target_time=15.0)
     assert float(s.time) <= 15.0
     assert float(next_rxn_time) >= 15.0
 
@@ -83,10 +83,10 @@ def test_final_time_at_or_past_target():
 def test_zero_propensities_is_frozen():
     """If all propensities are 0 the system should not advance."""
     key = jax.random.PRNGKey(7)
-    action = jnp.array([0.0, 0.0])
+    input = jnp.array([0.0, 0.0])
     s0 = initial_state(x0=5.0)
 
-    s, _ = _run_to(s0, key, action, target_time=100.0)
+    s, _ = _run_to(s0, key, input, target_time=100.0)
     assert float(s.x) == 5.0
     assert float(s.time) == 0.0
 
@@ -95,11 +95,11 @@ def test_pure_birth_mean_matches_poisson():
     """With birth rate λ and no death, E[X(T)] ≈ λ·T at large T (empirical
     check over many replicates)."""
     lam, T = 2.0, 50.0
-    action = jnp.array([lam, 0.0])
+    input = jnp.array([lam, 0.0])
     s0 = initial_state()
 
     def one_run(key):
-        s, _ = _run_to(s0, key, action, target_time=T, max_steps=5_000)
+        s, _ = _run_to(s0, key, input, target_time=T, max_steps=5_000)
         return s.x
 
     keys = jax.random.split(jax.random.PRNGKey(0), 200)
@@ -114,18 +114,18 @@ def test_pending_time_carries_across_calls():
     *distribution* over X(T) as a single call over [0, T] — this is the whole
     point of preserving the pending reaction time."""
     lam, T = 3.0, 10.0
-    action = jnp.array([lam, 0.2])
+    input = jnp.array([lam, 0.2])
     s0 = initial_state(x0=5.0)
 
     def single(k):
-        s, _ = _run_to(s0, k, action, target_time=T)
+        s, _ = _run_to(s0, k, input, target_time=T)
         return s.x
 
     def split(k):
         k1, k2 = jax.random.split(k)
-        s_a, next_rxn_a = _run_to(s0, k1, action, target_time=T / 2)
+        s_a, next_rxn_a = _run_to(s0, k1, input, target_time=T / 2)
         s_a = s_a._replace(next_reaction_time=next_rxn_a)
-        s_b, _ = _run_to(s_a, k2, action, target_time=T)
+        s_b, _ = _run_to(s_a, k2, input, target_time=T)
         return s_b.x
 
     keys = jax.random.split(jax.random.PRNGKey(0), 500)
@@ -139,13 +139,13 @@ def test_max_steps_is_respected():
     """With ``max_steps=0`` the loop must not execute any reactions even when
     propensities are large."""
     key = jax.random.PRNGKey(0)
-    action = jnp.array([1000.0, 1000.0])
+    input = jnp.array([1000.0, 1000.0])
     s0 = initial_state(x0=50.0)
 
     result = simulate_until(
         key=key,
         initial_state=s0,
-        action=action,
+        input=input,
         target_time=1000.0,
         max_steps=0,
         compute_propensities_fn=birth_death_propensities,
@@ -160,24 +160,24 @@ def test_max_steps_is_respected():
     assert float(s.time) == 0.0
 
 
-# --- action-change invalidation --------------------------------------------------
+# --- input-change invalidation --------------------------------------------------
 #
-# The loop invalidates ``pending_reaction_time`` whenever ``action != previous_action``
+# The loop invalidates ``pending_reaction_time`` whenever ``input != previous_input``
 # so the new propensities don't reuse a tau sampled under the old ones. An older
 # implementation used ``jnp.logical_xor(prev, curr)`` which silently cast floats
 # to bool, so e.g. 0.3 → 0.7 looked "unchanged". These four tests pin the correct
-# behaviour for both binary and continuous actions.
+# behaviour for both binary and continuous inputs.
 
 
-def _minimal_action_system():
-    """Single reaction with action-dependent propensity; state carries only x."""
+def _minimal_input_system():
+    """Single reaction with input-dependent propensity; state carries only x."""
 
     class S(NamedTuple):
         time: jax.Array
         x: jax.Array
 
-    def propensities(state, action):
-        return jnp.array([action + 0.1])
+    def propensities(state, input):
+        return jnp.array([input + 0.1])
 
     def apply(state, _idx):
         return state._replace(x=state.x + 1)
@@ -185,12 +185,12 @@ def _minimal_action_system():
     return S, propensities, apply
 
 
-def _run_with_pending(prev_action, action, pending):
-    S, propensities, apply = _minimal_action_system()
+def _run_with_pending(prev_input, input, pending):
+    S, propensities, apply = _minimal_input_system()
     return simulate_until(
         key=jax.random.PRNGKey(0),
         initial_state=S(time=jnp.array(0.0), x=jnp.array(0.0)),
-        action=jnp.asarray(action),
+        input=jnp.asarray(input),
         target_time=jnp.array(0.01),  # short enough to not fire a reaction
         max_steps=1,
         compute_propensities_fn=propensities,
@@ -198,7 +198,7 @@ def _run_with_pending(prev_action, action, pending):
         get_time_fn=lambda s: s.time,
         update_time_fn=lambda s, t: s._replace(time=t),
         pending_reaction_time=jnp.asarray(pending),
-        previous_action=jnp.asarray(prev_action),
+        previous_input=jnp.asarray(prev_input),
     )
 
 
@@ -207,35 +207,35 @@ def _run_with_pending(prev_action, action, pending):
     [(0.0, 1.0), (0.3, 0.7)],  # binary, continuous
     ids=["binary", "continuous"],
 )
-def test_action_change_invalidates_pending(prev, curr):
+def test_input_change_invalidates_pending(prev, curr):
     pending = 10.0
     _, next_rxn = _run_with_pending(prev, curr, pending)
     assert not jnp.isclose(next_rxn, pending)
 
 
 @pytest.mark.parametrize(
-    "action",
+    "input",
     [1.0, 0.42],  # binary, continuous
     ids=["binary", "continuous"],
 )
-def test_action_unchanged_preserves_pending(action):
+def test_input_unchanged_preserves_pending(input):
     pending = 10.0
-    _, next_rxn = _run_with_pending(action, action, pending)
+    _, next_rxn = _run_with_pending(input, input, pending)
     assert jnp.isclose(next_rxn, pending)
 
 
 def test_jit_compiles_and_runs():
     """``simulate_until`` must compile under ``jax.jit`` when ``max_steps``
     is treated as a static int."""
-    action = jnp.array([1.0, 0.1])
+    input = jnp.array([1.0, 0.1])
     s0 = initial_state()
 
     @jax.jit
-    def run(key, state, action):
+    def run(key, state, input):
         return simulate_until(
             key=key,
             initial_state=state,
-            action=action,
+            input=input,
             target_time=10.0,
             max_steps=1_000,
             compute_propensities_fn=birth_death_propensities,
@@ -245,7 +245,7 @@ def test_jit_compiles_and_runs():
             pending_reaction_time=state.next_reaction_time,
         )
 
-    s, _ = run(jax.random.PRNGKey(0), s0, action)
+    s, _ = run(jax.random.PRNGKey(0), s0, input)
     # Just check it runs and produces a finite state.
     assert jnp.isfinite(s.x)
     assert jnp.isfinite(s.time)
@@ -256,16 +256,16 @@ def test_vmap_parallel_different_parameters():
     n = 32
     birth_rates = jnp.linspace(0.5, 5.0, n)
     death_rates = jnp.full(n, 0.1)
-    actions = jnp.stack([birth_rates, death_rates], axis=1)  # (n, 2)
+    inputs = jnp.stack([birth_rates, death_rates], axis=1)  # (n, 2)
 
     s0 = initial_state()
 
-    def one(key, action):
-        s, _ = _run_to(s0, key, action, target_time=50.0)
+    def one(key, input):
+        s, _ = _run_to(s0, key, input, target_time=50.0)
         return s.x
 
     keys = jax.random.split(jax.random.PRNGKey(0), n)
-    xs = jax.vmap(one)(keys, actions)
+    xs = jax.vmap(one)(keys, inputs)
     # Higher birth rate ⇒ higher mean X (monotone trend at 50 min).
     # Not a sharp test (stochastic) but the extremes should differ.
     assert float(jnp.mean(xs[-4:])) > float(jnp.mean(xs[:4]))
@@ -279,13 +279,13 @@ def test_simulate_interval_advances_time():
     ``next_reaction_time`` must be ≥ target so it can be threaded into the
     next call."""
     key = jax.random.PRNGKey(0)
-    action = jnp.array([1.0, 0.1])
+    input = jnp.array([1.0, 0.1])
     s0 = initial_state()
 
     s1 = simulate_interval(
         key=key,
         state=s0,
-        action=action,
+        input=input,
         timestep=5.0,
         max_steps=1_000,
         compute_propensities_fn=birth_death_propensities,
@@ -297,7 +297,7 @@ def test_simulate_interval_advances_time():
 
 def test_simulate_interval_chain_matches_distribution():
     """Chaining ``simulate_interval`` calls should reproduce the marginal at T."""
-    action = jnp.array([1.5, 0.1])
+    input = jnp.array([1.5, 0.1])
     T = 20.0
 
     def chained(key):
@@ -307,7 +307,7 @@ def test_simulate_interval_chain_matches_distribution():
             state = simulate_interval(
                 key=sub,
                 state=state,
-                action=action,
+                input=input,
                 timestep=T / 4,
                 max_steps=2_000,
                 compute_propensities_fn=birth_death_propensities,
@@ -326,7 +326,7 @@ def test_simulate_interval_chain_matches_distribution():
 
 def test_simulate_interval_jits():
     """The wrapper should compile under jit just like the core function."""
-    action = jnp.array([1.0, 0.1])
+    input = jnp.array([1.0, 0.1])
     s0 = initial_state()
 
     @jax.jit
@@ -334,7 +334,7 @@ def test_simulate_interval_jits():
         return simulate_interval(
             key=key,
             state=state,
-            action=action,
+            input=input,
             timestep=2.0,
             max_steps=500,
             compute_propensities_fn=birth_death_propensities,
@@ -361,7 +361,7 @@ def test_simulate_trajectory_shapes_and_times():
         n_steps=n_steps,
         compute_propensities_fn=birth_death_propensities,
         apply_reaction_fn=birth_death_apply,
-        actions=jnp.tile(jnp.array([1.0, 0.1]), (n_steps, 1)),
+        inputs=jnp.tile(jnp.array([1.0, 0.1]), (n_steps, 1)),
     )
     assert states.x.shape == (n_steps,)
     assert states.time.shape == (n_steps,)
@@ -369,11 +369,11 @@ def test_simulate_trajectory_shapes_and_times():
     assert jnp.allclose(states.time, expected_times)
 
 
-def test_simulate_trajectory_no_actions_branch():
-    """``actions=None`` takes a separate scan branch that does no action
+def test_simulate_trajectory_no_inputs_branch():
+    """``inputs=None`` takes a separate scan branch that does no input
     threading. Verify it runs and produces a proper stacked trajectory."""
 
-    def propensities(_state, _action):  # action is an unused scalar
+    def propensities(_state, _input):  # input is an unused scalar
         return jnp.array([1.0])
 
     def apply(state, _idx):
@@ -394,7 +394,7 @@ def test_simulate_trajectory_no_actions_branch():
     assert jnp.all(jnp.diff(states.x) >= 0)
 
 
-def test_simulate_trajectory_actions_shape_mismatch_raises():
+def test_simulate_trajectory_inputs_shape_mismatch_raises():
     s0 = initial_state()
     with pytest.raises(ValueError, match="n_steps"):
         simulate_trajectory(
@@ -404,13 +404,13 @@ def test_simulate_trajectory_actions_shape_mismatch_raises():
             n_steps=5,
             compute_propensities_fn=birth_death_propensities,
             apply_reaction_fn=birth_death_apply,
-            actions=jnp.zeros((3, 2)),
+            inputs=jnp.zeros((3, 2)),
         )
 
 
-def test_simulate_trajectory_actions_affect_output():
-    """Per-step actions must be threaded into the scan — guards against the
-    scan silently using a fixed action. Higher birth-rate schedule ⇒ higher X."""
+def test_simulate_trajectory_inputs_affect_output():
+    """Per-step inputs must be threaded into the scan — guards against the
+    scan silently using a fixed input. Higher birth-rate schedule ⇒ higher X."""
     s0 = initial_state(x0=5.0)
     n_steps = 20
 
@@ -421,7 +421,7 @@ def test_simulate_trajectory_actions_affect_output():
         n_steps=n_steps,
         compute_propensities_fn=birth_death_propensities,
         apply_reaction_fn=birth_death_apply,
-        actions=jnp.tile(jnp.array([0.1, 0.1]), (n_steps, 1)),
+        inputs=jnp.tile(jnp.array([0.1, 0.1]), (n_steps, 1)),
     )
     high = simulate_trajectory(
         key=jax.random.PRNGKey(0),
@@ -430,6 +430,6 @@ def test_simulate_trajectory_actions_affect_output():
         n_steps=n_steps,
         compute_propensities_fn=birth_death_propensities,
         apply_reaction_fn=birth_death_apply,
-        actions=jnp.tile(jnp.array([10.0, 0.1]), (n_steps, 1)),
+        inputs=jnp.tile(jnp.array([10.0, 0.1]), (n_steps, 1)),
     )
     assert float(high.x[-1]) > float(low.x[-1])

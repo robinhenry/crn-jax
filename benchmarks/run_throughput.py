@@ -1,0 +1,163 @@
+"""Throughput sweep: trajectories/second at fixed time horizon T=20.
+
+For each (library, model, n_trajectories) cell:
+  - 1 warm-up call (incurs JIT compile for JAX libs).
+  - 5 timed calls; median + IQR reported as trajectories/sec.
+  - JIT-compile time captured separately as the (warmup_time - median_run_time).
+
+GillesPy2 SSACSolver (C++ backend) is used as the CPU baseline.
+
+Outputs results/throughput_<device>.json — one record per cell.
+
+Platform selection: parses --device early and sets ``JAX_PLATFORMS`` *before*
+``import jax`` so the requested backend is actually used. (Setting the env var
+after JAX initialises is a no-op.)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+# --- Platform selection: must run before `import jax` -----------------------
+def _early_device() -> str:
+    for i, a in enumerate(sys.argv):
+        if a == "--device" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if a.startswith("--device="):
+            return a.split("=", 1)[1]
+    return "gpu"
+
+_DEVICE = _early_device()
+os.environ["JAX_PLATFORMS"] = "cpu" if _DEVICE == "cpu" else "cuda"
+
+import jax  # noqa: E402
+import numpy as np  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
+
+
+# (lib, supports_gpu). GillesPy2's SSACSolver is C++-CPU only.
+LIBRARIES = [
+    ("crn_jax", True),
+    ("gillespy2", False),
+]
+
+# CPU sweep — crn-jax has no parallelism on CPU, so the slope continues
+# linearly past N=1 000. We cap there to keep wall-clock bounded; the
+# narrative is GPU-vs-CPU, not the exact CPU asymptote.
+DEFAULT_CPU_NS = (10, 100, 1_000)
+# 10x increments — ride the GPU to its memory ceiling. Per-cell OOMs are
+# caught and recorded so the sweep keeps going. (crn-jax only; GillesPy2
+# is CPU-only.)
+DEFAULT_GPU_NS = (10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000)
+DEFAULT_REPS = 3
+
+
+def _time_one(run_fn, key_or_seed_fn, n_traj, n_reps=DEFAULT_REPS, warmup=True):
+    """Run warmup + n_reps timed runs. Returns (warmup_secs, median_secs, q25_secs, q75_secs)."""
+    warm_t = None
+    if warmup:
+        t0 = time.perf_counter()
+        out = run_fn(key_or_seed_fn(0), n_traj)
+        # crn-jax: block_until_ready already inside run_fn.
+        # gillespy2: returns numpy already.
+        del out
+        warm_t = time.perf_counter() - t0
+
+    times = []
+    for rep in range(n_reps):
+        t0 = time.perf_counter()
+        out = run_fn(key_or_seed_fn(rep + 1), n_traj)
+        del out
+        times.append(time.perf_counter() - t0)
+    times = np.array(times)
+    return warm_t, float(np.median(times)), float(np.quantile(times, 0.25)), float(np.quantile(times, 0.75))
+
+
+def _make_runners(model_name: str):
+    from benchmarks.models import get
+    model = get(model_name)
+
+    # Apples-to-apples: both libraries produce a full (N, n_steps, n_species)
+    # trajectory grid sampled at dt=0.1 (no "final state only" shortcuts).
+    runners = {
+        "crn_jax": (
+            lambda i: jax.random.PRNGKey(i),
+            lambda key, n: model.run_crn_jax(key, n, return_full_trajectory=True),
+        ),
+        "gillespy2": (
+            lambda i: i + 1,  # gillespy2 wants a positive int seed
+            lambda seed, n: model.run_gillespy2(seed, n, return_full_trajectory=True),
+        ),
+    }
+    return runners
+
+
+def _sweep(model_name: str, ns: list[int], libs: list[str], n_reps: int = DEFAULT_REPS) -> list[dict]:
+    runners = _make_runners(model_name)
+    rows = []
+    for n in ns:
+        for lib in libs:
+            key_fn, run_fn = runners[lib]
+            print(f"  {model_name:>16s} {lib:>10s} N={n:>8d} …", end="", flush=True)
+            try:
+                warm, med, q25, q75 = _time_one(run_fn, key_fn, n, n_reps=n_reps)
+                tps = n / med
+                jit_secs = max(0.0, (warm or med) - med)
+                print(f"  median={med*1000:8.1f}ms  ({tps:>10,.0f} traj/s)  JIT≈{jit_secs*1000:6.0f}ms")
+                rows.append(dict(model=model_name, lib=lib, n=n, warm_s=warm,
+                                 median_s=med, q25_s=q25, q75_s=q75,
+                                 traj_per_s=tps, jit_compile_s=jit_secs))
+            except Exception as e:
+                print(f"  ERROR: {type(e).__name__}: {str(e)[:80]}")
+                rows.append(dict(model=model_name, lib=lib, n=n, error=str(e)))
+    return rows
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--device", choices=["cpu", "gpu"], required=True)
+    p.add_argument("--models", nargs="*", default=["birth_death", "lotka_volterra", "linear_cascade"])
+    p.add_argument("--n", nargs="*", type=int, default=None)
+    p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--reps", type=int, default=DEFAULT_REPS,
+                   help=f"timed reps per cell (default: {DEFAULT_REPS}, plus 1 untimed warmup)")
+    args = p.parse_args()
+
+    expected = "cpu" if args.device == "cpu" else "gpu"
+    actual = jax.devices()[0].platform
+    print(f"JAX devices: {jax.devices()}  (expected {expected})")
+    assert (expected == "cpu") == (actual == "cpu"), (
+        f"JAX platform mismatch: requested {expected}, got {actual}. "
+        "JAX_PLATFORMS may have been set too late."
+    )
+
+    if args.n is None:
+        ns = list(DEFAULT_GPU_NS if args.device == "gpu" else DEFAULT_CPU_NS)
+    else:
+        ns = args.n
+
+    libs = [lib for lib, gpu_ok in LIBRARIES if args.device == "cpu" or gpu_ok]
+    print(f"Libraries on {args.device}: {libs}")
+
+    all_rows = []
+    for model_name in args.models:
+        print(f"\n--- {model_name} ---")
+        rows = _sweep(model_name, ns, libs, n_reps=args.reps)
+        all_rows.extend(rows)
+
+    out_path = args.out or RESULTS_DIR / f"throughput_{args.device}.json"
+    out_path.write_text(json.dumps(all_rows, indent=2))
+    print(f"\nWrote {out_path}")
+
+
+if __name__ == "__main__":
+    main()

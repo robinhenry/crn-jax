@@ -49,9 +49,9 @@ class State(NamedTuple):
     next_reaction_time: jax.Array
 
 
-def propensities(state: State, action: jax.Array) -> jax.Array:
-    # `action` here is the (scalar) light input U ∈ [0, 1].
-    a_plus = K_PROD * hill_function(action, K_HILL, N_HILL)
+def propensities(state: State, input: jax.Array) -> jax.Array:
+    # `input` here is the (scalar) light input U ∈ [0, 1].
+    a_plus = K_PROD * hill_function(input, K_HILL, N_HILL)
     a_minus = K_DEG * state.x
     return jnp.array([a_plus, a_minus])
 
@@ -66,7 +66,7 @@ def apply_reaction(state: State, j: jax.Array) -> State:
 def _sample_configs(
     key: jax.Array, n_replicates: int,
 ) -> tuple[jax.Array, State, jax.Array]:
-    """Draw ``n`` independent (sim_key, initial_state, action_schedule) triples.
+    """Draw ``n`` independent (sim_key, initial_state, input_schedule) triples.
 
     Each leaf of the returned PyTree has a leading batch dim of size ``n``,
     which is what ``jax.vmap(..., in_axes=0)`` consumes.
@@ -98,12 +98,12 @@ def _sample_configs(
 
 # --- Simulation --------------------------------------------------------------
 def _simulate(
-    keys: jax.Array, initial_states: State, actions: jax.Array,
+    keys: jax.Array, initial_states: State, inputs: jax.Array,
 ) -> tuple[jax.Array, jax.Array]:
     """Run one trajectory per replicate, vmapping over ALL per-replicate inputs."""
     # vmap's default in_axes=0 maps over axis 0 of every argument, including
     # every leaf of the `initial_states` PyTree. Each replicate therefore sees
-    # a scalar `State` and a (N_STEPS,) `actions` array — exactly what a
+    # a scalar `State` and a (N_STEPS,) `inputs` array — exactly what a
     # single-replicate call to `simulate_trajectory` expects.
     @jax.jit
     @jax.vmap
@@ -115,10 +115,10 @@ def _simulate(
             n_steps=N_STEPS,
             compute_propensities_fn=propensities,
             apply_reaction_fn=apply_reaction,
-            actions=acts,
+            inputs=acts,
         )
 
-    states = run_one(keys, initial_states, actions)
+    states = run_one(keys, initial_states, inputs)
 
     # Prepend each replicate's initial state so the starting-point variation is
     # visible at t=0 in the plot.

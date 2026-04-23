@@ -38,8 +38,8 @@ class State(NamedTuple):
     next_reaction_time: jax.Array
 
 
-def propensities(state: State, _action: jax.Array) -> jax.Array:
-    # Constant-rate birth + first-order degradation. The `action` argument is
+def propensities(state: State, _input: jax.Array) -> jax.Array:
+    # Constant-rate birth + first-order degradation. The `input` argument is
     # required by the `compute_propensities_fn` contract but unused here.
     return jnp.array([BIRTH_RATE, DEATH_RATE * state.x])
 

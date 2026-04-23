@@ -43,7 +43,7 @@ simulation-interval boundaries. Specifically:
 - When :math:`t + \\tau > t_{\\text{end}}`, the pending time :math:`t + \\tau`
   is returned alongside the state so the caller can thread it into the next
   call.
-- When the control input (``action``) changes between calls, the pending time
+- When the control input (``input``) changes between calls, the pending time
   is invalidated (propensities have changed and the old schedule is stale).
 - When the state changes because a reaction occurred, a fresh :math:`\\tau` is
   sampled automatically inside the loop.
@@ -77,7 +77,7 @@ from .types import PRNGKey
 def simulate_until(
     key: PRNGKey,
     initial_state: Any,
-    action: Array,
+    input: Array,
     target_time: float | Array,
     max_steps: int,
     compute_propensities_fn: Callable[[Any, Array], Array],
@@ -85,7 +85,7 @@ def simulate_until(
     get_time_fn: Callable[[Any], Array],
     update_time_fn: Callable[[Any, float | Array], Any],
     pending_reaction_time: Array | None = None,
-    previous_action: Array | None = None,
+    previous_input: Array | None = None,
 ) -> tuple[Any, Array]:
     """Execute Gillespie SSA until ``target_time``, preserving pending reactions.
 
@@ -99,12 +99,12 @@ def simulate_until(
         initial_state: Starting state (arbitrary PyTree). The only structural
             requirement is that ``get_time_fn`` / ``update_time_fn`` can read
             and update a scalar time field from it.
-        action: Current control input. Passed to ``compute_propensities_fn``
-            and used (together with ``previous_action`` if supplied) to decide
+        input: Current control input. Passed to ``compute_propensities_fn``
+            and used (together with ``previous_input`` if supplied) to decide
             whether the pending reaction time is still valid.
         target_time: Simulate until this absolute time.
         max_steps: Safety upper bound on the number of reactions in this call.
-        compute_propensities_fn: ``(state, action) -> Array[M]`` returning the
+        compute_propensities_fn: ``(state, input) -> Array[M]`` returning the
             non-negative propensities for M reaction channels. The caller is
             expected to close over any extra parameters (kinetic constants,
             config, etc.).
@@ -115,8 +115,8 @@ def simulate_until(
         update_time_fn: ``(state, time) -> state`` writing the scalar time.
         pending_reaction_time: Scheduled reaction time from the previous call,
             or ``None`` / ``inf`` to sample fresh.
-        previous_action: Action from the previous call. If provided and
-            different from ``action``, the pending reaction time is
+        previous_input: Input from the previous call. If provided and
+            different from ``input``, the pending reaction time is
             invalidated (propensities have changed).
 
     Returns:
@@ -140,20 +140,20 @@ def simulate_until(
     if pending_reaction_time is None:
         pending_reaction_time = jnp.array(jnp.inf)
 
-    # Invalidate pending reaction if the action changed (propensities differ).
+    # Invalidate pending reaction if the input changed (propensities differ).
     # Element-wise inequality is used so this is correct for both binary and
-    # continuous actions — a boolean XOR would silently cast floats to bool.
-    if previous_action is not None:
-        action_changed = jnp.any(jnp.asarray(previous_action) != jnp.asarray(action))
+    # continuous inputs — a boolean XOR would silently cast floats to bool.
+    if previous_input is not None:
+        input_changed = jnp.any(jnp.asarray(previous_input) != jnp.asarray(input))
         pending_reaction_time = jnp.where(
-            action_changed, jnp.array(jnp.inf), pending_reaction_time
+            input_changed, jnp.array(jnp.inf), pending_reaction_time
         )
 
     # Sample an initial reaction time if we don't have one carried over.
     initial_time = get_time_fn(initial_state)
     key, key_init = jax.random.split(key)
     needs_sample = jnp.isinf(pending_reaction_time)
-    initial_propensities = compute_propensities_fn(initial_state, action)
+    initial_propensities = compute_propensities_fn(initial_state, input)
     sampled_tau = sample_tau(key_init, initial_propensities)
     next_reaction_time = jnp.where(
         needs_sample, initial_time + sampled_tau, pending_reaction_time
@@ -171,12 +171,12 @@ def simulate_until(
         state = update_time_fn(state, next_rxn_time)
 
         # Sample which reaction (using pre-reaction propensities) and apply it.
-        propensities = compute_propensities_fn(state, action)
+        propensities = compute_propensities_fn(state, input)
         reaction_idx = sample_reaction(key_reaction, propensities)
         state = apply_reaction_fn(state, reaction_idx)
 
         # Post-reaction propensities have changed; sample the next tau.
-        new_propensities = compute_propensities_fn(state, action)
+        new_propensities = compute_propensities_fn(state, input)
         tau = sample_tau(key_time, new_propensities)
         new_next_rxn_time = get_time_fn(state) + tau
 
@@ -194,13 +194,13 @@ def simulate_until(
 def simulate_interval(
     key: PRNGKey,
     state: Any,
-    action: Array,
+    input: Array,
     *,
     timestep: float | Array,
     max_steps: int,
     compute_propensities_fn: Callable[[Any, Array], Array],
     apply_reaction_fn: Callable[[Any, Array], Any],
-    previous_action: Array | None = None,
+    previous_input: Array | None = None,
     interval_start: float | Array | None = None,
 ) -> Any:
     """Advance a state by one fixed-length interval using the Gillespie SSA.
@@ -212,13 +212,13 @@ def simulate_interval(
         key: PRNG key.
         state: Current state; must expose ``time``, ``next_reaction_time``,
             and ``_replace`` (see module docstring).
-        action: Control input passed to ``compute_propensities_fn`` and used
+        input: Control input passed to ``compute_propensities_fn`` and used
             to invalidate the pending reaction time when it changes.
         timestep: Length of the interval to simulate.
         max_steps: Safety upper bound on reactions executed in this call.
-        compute_propensities_fn: ``(state, action) -> Array[M]``.
+        compute_propensities_fn: ``(state, input) -> Array[M]``.
         apply_reaction_fn: ``(state, reaction_idx) -> state``.
-        previous_action: Optional — action from the previous interval.
+        previous_input: Optional — input from the previous interval.
         interval_start: Absolute start time of this interval. Defaults to
             ``state.time`` (suitable for free-running simulation).
 
@@ -233,7 +233,7 @@ def simulate_interval(
     final_state, next_reaction_time = simulate_until(
         key=key,
         initial_state=state,
-        action=action,
+        input=input,
         target_time=target_time,
         max_steps=max_steps,
         compute_propensities_fn=compute_propensities_fn,
@@ -241,12 +241,12 @@ def simulate_interval(
         get_time_fn=lambda s: s.time,
         update_time_fn=lambda s, t: s._replace(time=t),
         pending_reaction_time=state.next_reaction_time,
-        previous_action=previous_action,
+        previous_input=previous_input,
     )
     # ``simulate_until`` leaves ``state.time`` at the time of the last
     # reaction that fired inside the interval (or at ``interval_start`` if
-    # none fired). For iterated RL-style stepping we want it to reflect
-    # wall-clock, so advance to ``target_time`` here.
+    # none fired). For iterated fixed-interval stepping we want it to
+    # reflect wall-clock, so advance to ``target_time`` here.
     return final_state._replace(time=target_time, next_reaction_time=next_reaction_time)
 
 
@@ -258,7 +258,7 @@ def simulate_trajectory(
     n_steps: int,
     compute_propensities_fn: Callable[[Any, Array], Array],
     apply_reaction_fn: Callable[[Any, Array], Any],
-    actions: Array | None = None,
+    inputs: Array | None = None,
     max_steps: int = 10_000,
 ) -> Any:
     """Scan :func:`simulate_interval` ``n_steps`` times and stack the per-step states.
@@ -274,13 +274,13 @@ def simulate_trajectory(
         timestep: Length of each interval.
         n_steps: Number of intervals to simulate. Must be a Python ``int``
             (it fixes ``jax.lax.scan``'s trip count).
-        compute_propensities_fn: ``(state, action) -> Array[M]``.
+        compute_propensities_fn: ``(state, input) -> Array[M]``.
         apply_reaction_fn: ``(state, reaction_idx) -> state``.
-        actions: Optional ``(n_steps, ...)`` array of per-step control
+        inputs: Optional ``(n_steps, ...)`` array of per-step control
             inputs. If ``None``, a zero scalar is used for every interval
-            and no action-change invalidation is performed. If supplied,
-            the previous action is threaded through the scan so that
-            changing actions correctly invalidate pending reactions.
+            and no input-change invalidation is performed. If supplied,
+            the previous input is threaded through the scan so that
+            changing inputs correctly invalidate pending reactions.
         max_steps: Safety upper bound on reactions executed per interval.
 
     Returns:
@@ -291,14 +291,14 @@ def simulate_trajectory(
     """
     keys = jax.random.split(key, n_steps)
 
-    if actions is None:
-        zero_action = jnp.array(0.0)
+    if inputs is None:
+        zero_input = jnp.array(0.0)
 
         def body(state, k):
             new_state = simulate_interval(
                 key=k,
                 state=state,
-                action=zero_action,
+                input=zero_input,
                 timestep=timestep,
                 max_steps=max_steps,
                 compute_propensities_fn=compute_propensities_fn,
@@ -309,31 +309,31 @@ def simulate_trajectory(
         _, states = jax.lax.scan(body, initial_state, keys)
         return states
 
-    actions = jnp.asarray(actions)
-    if actions.shape[0] != n_steps:
+    inputs = jnp.asarray(inputs)
+    if inputs.shape[0] != n_steps:
         raise ValueError(
-            f"actions leading dimension ({actions.shape[0]}) must match "
+            f"inputs leading dimension ({inputs.shape[0]}) must match "
             f"n_steps ({n_steps})"
         )
 
-    def body_with_action(carry, inputs):
-        state, prev_action = carry
-        k, action = inputs
+    def body_with_input(carry, step):
+        state, prev_input = carry
+        k, u = step
         new_state = simulate_interval(
             key=k,
             state=state,
-            action=action,
+            input=u,
             timestep=timestep,
             max_steps=max_steps,
             compute_propensities_fn=compute_propensities_fn,
             apply_reaction_fn=apply_reaction_fn,
-            previous_action=prev_action,
+            previous_input=prev_input,
         )
-        return (new_state, action), new_state
+        return (new_state, u), new_state
 
-    # Seeding prev_action with actions[0] means the first step sees "no change"
+    # Seeding prev_input with inputs[0] means the first step sees "no change"
     # and trusts the pending reaction stored in initial_state.
     (_, _), states = jax.lax.scan(
-        body_with_action, (initial_state, actions[0]), (keys, actions)
+        body_with_input, (initial_state, inputs[0]), (keys, inputs)
     )
     return states

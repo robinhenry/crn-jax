@@ -21,15 +21,15 @@ class BirthDeathState(NamedTuple):
 
 
 def birth_death_propensities(
-    state: BirthDeathState, action: jax.Array
+    state: BirthDeathState, input: jax.Array
 ) -> jax.Array:
-    """Birth at constant rate ``action[0]``, death at rate ``action[1] * x``.
+    """Birth at constant rate ``input[0]``, death at rate ``input[1] * x``.
 
-    The ``action`` is a length-2 array of (birth_rate, death_rate) so the tests
-    can exercise the action-change invalidation path without needing a full
+    The ``input`` is a length-2 array of (birth_rate, death_rate) so the tests
+    can exercise the input-change invalidation path without needing a full
     control signal.
     """
-    birth_rate, death_rate = action[0], action[1]
+    birth_rate, death_rate = input[0], input[1]
     return jnp.array([birth_rate, death_rate * state.x])
 
 

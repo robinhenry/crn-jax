@@ -30,6 +30,13 @@ examples = [
     "matplotlib>=3.7",
     "numpy>=1.24",
 ]
+cuda = [
+    "jax[cuda12]>=0.4.20",
+]
+benchmarks = [
+    "matplotlib>=3.7",
+    "numpy>=1.24",
+]
 dev = [
     "ruff>=0.6",
 ]
