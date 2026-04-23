@@ -2,8 +2,15 @@
 
 For each (library, model, n_trajectories) cell:
   - 1 warm-up call (incurs JIT compile for JAX libs).
-  - 5 timed calls; median + IQR reported as trajectories/sec.
+  - ``DEFAULT_REPS`` timed calls; median + IQR reported.
   - JIT-compile time captured separately as the (warmup_time - median_run_time).
+
+Two timings per run are recorded for JAX libs:
+  - ``compute`` — ends at ``block_until_ready()`` (pure on-device SSA cost).
+  - ``total``   — also includes the ``np.asarray()`` device→host transfer
+                  (apples-to-apples with GillesPy2, whose output is already
+                  on the host).
+For GillesPy2 the two are identical.
 
 GillesPy2 SSACSolver (C++ backend) is used as the CPU baseline.
 
@@ -64,24 +71,40 @@ DEFAULT_REPS = 3
 
 
 def _time_one(run_fn, key_or_seed_fn, n_traj, n_reps=DEFAULT_REPS, warmup=True):
-    """Run warmup + n_reps timed runs. Returns (warmup_secs, median_secs, q25_secs, q75_secs)."""
+    """Run warmup + n_reps timed runs.
+
+    Each timed call records two phases:
+      compute — ends at ``block_until_ready()`` (pure on-device cost).
+      total   — also includes the ``np.asarray()`` device→host copy.
+    For libs that return host arrays, compute == total.
+
+    Returns (warmup_secs, compute_times_array, total_times_array).
+    """
+
+    def _run_and_time(key_or_seed):
+        t0 = time.perf_counter()
+        out = run_fn(key_or_seed, n_traj)
+        # Compute phase: wait for any async on-device work to finish.
+        if hasattr(out, "block_until_ready"):
+            out.block_until_ready()
+        t_compute = time.perf_counter() - t0
+        # Transfer phase: pull the result to the host.
+        np.asarray(out)
+        t_total = time.perf_counter() - t0
+        return t_compute, t_total
+
     warm_t = None
     if warmup:
         t0 = time.perf_counter()
-        out = run_fn(key_or_seed_fn(0), n_traj)
-        # crn-jax: block_until_ready already inside run_fn.
-        # gillespy2: returns numpy already.
-        del out
+        _run_and_time(key_or_seed_fn(0))
         warm_t = time.perf_counter() - t0
 
-    times = []
+    compute_times, total_times = [], []
     for rep in range(n_reps):
-        t0 = time.perf_counter()
-        out = run_fn(key_or_seed_fn(rep + 1), n_traj)
-        del out
-        times.append(time.perf_counter() - t0)
-    times = np.array(times)
-    return warm_t, float(np.median(times)), float(np.quantile(times, 0.25)), float(np.quantile(times, 0.75))
+        tc, tt = _run_and_time(key_or_seed_fn(rep + 1))
+        compute_times.append(tc)
+        total_times.append(tt)
+    return warm_t, np.array(compute_times), np.array(total_times)
 
 
 def _make_runners(model_name: str):
@@ -112,20 +135,32 @@ def _sweep(model_name: str, ns: list[int], libs: list[str], n_reps: int = DEFAUL
             key_fn, run_fn = runners[lib]
             print(f"  {model_name:>16s} {lib:>10s} N={n:>8d} …", end="", flush=True)
             try:
-                warm, med, q25, q75 = _time_one(run_fn, key_fn, n, n_reps=n_reps)
-                tps = n / med
-                jit_secs = max(0.0, (warm or med) - med)
-                print(f"  median={med * 1000:8.1f}ms  ({tps:>10,.0f} traj/s)  JIT≈{jit_secs * 1000:6.0f}ms")
+                warm, ctimes, ttimes = _time_one(run_fn, key_fn, n, n_reps=n_reps)
+                c_med = float(np.median(ctimes))
+                t_med = float(np.median(ttimes))
+                c_tps = n / c_med
+                t_tps = n / t_med
+                jit_secs = max(0.0, (warm or t_med) - t_med)
+                print(
+                    f"  compute={c_med * 1000:7.1f}ms total={t_med * 1000:7.1f}ms "
+                    f"({c_tps:>11,.0f} | {t_tps:>11,.0f} traj/s)  JIT≈{jit_secs * 1000:6.0f}ms"
+                )
                 rows.append(
                     dict(
                         model=model_name,
                         lib=lib,
                         n=n,
                         warm_s=warm,
-                        median_s=med,
-                        q25_s=q25,
-                        q75_s=q75,
-                        traj_per_s=tps,
+                        # Backward-compat fields (total = compute + D→H transfer).
+                        median_s=t_med,
+                        q25_s=float(np.quantile(ttimes, 0.25)),
+                        q75_s=float(np.quantile(ttimes, 0.75)),
+                        traj_per_s=t_tps,
+                        # Compute-only fields (ends at block_until_ready).
+                        median_compute_s=c_med,
+                        q25_compute_s=float(np.quantile(ctimes, 0.25)),
+                        q75_compute_s=float(np.quantile(ctimes, 0.75)),
+                        traj_per_s_compute=c_tps,
                         jit_compile_s=jit_secs,
                     )
                 )

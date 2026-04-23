@@ -32,7 +32,7 @@ version = "0.0.0"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-jax = "^0.7"
+jax = "^0.10"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.14.10"
@@ -46,7 +46,7 @@ numpy = "^2.0"
 optional = true
 
 [tool.poetry.group.gpu.dependencies]
-jax = { version = "^0.7", extras = ["cuda12"] }
+jax = { version = "^0.10", extras = ["cuda12"] }
 
 [project.optional-dependencies]
 examples = [

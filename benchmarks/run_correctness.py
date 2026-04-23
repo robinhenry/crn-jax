@@ -46,7 +46,7 @@ MEAN_ABS_TOL = 0.5
 
 def _final_state(run_fn, key_or_seed, n_traj: int) -> np.ndarray:
     """(n_traj, n_species) ndarray of final states; collapses 1D outputs."""
-    out = run_fn(key_or_seed, n_traj, return_full_trajectory=False)
+    out = np.asarray(run_fn(key_or_seed, n_traj, return_full_trajectory=False))
     if out.ndim == 1:
         out = out[:, None]
     return out

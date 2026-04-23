@@ -105,18 +105,15 @@ def _build_crn_jax_runner():
     return run
 
 
-def run_crn_jax(key: jax.Array, n_trajectories: int, *, return_full_trajectory: bool = False):
-    """Full: (n_trajectories, N_STEPS, N_SPECIES); final: (n_trajectories, N_SPECIES)."""
+def run_crn_jax(key: jax.Array, n_trajectories: int, *, return_full_trajectory: bool = False) -> jax.Array:
+    """Returns an on-device jax.Array. Caller is responsible for block_until_ready / np.asarray.
+    Full: (n_trajectories, N_STEPS, N_SPECIES); final: (n_trajectories, N_SPECIES)."""
     global _crn_jax_runner
     if _crn_jax_runner is None:
         _crn_jax_runner = _build_crn_jax_runner()
     keys = jax.random.split(key, n_trajectories)
     states = _crn_jax_runner(keys)
-    states.x.block_until_ready()
-    out = np.asarray(states.x)
-    if return_full_trajectory:
-        return out
-    return out[:, -1, :]
+    return states.x if return_full_trajectory else states.x[:, -1, :]
 
 
 # --- gillespy2 encoding ------------------------------------------------------
