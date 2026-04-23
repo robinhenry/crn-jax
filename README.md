@@ -62,7 +62,7 @@ class State(NamedTuple):
     next_reaction_time: jax.Array    # carried across intervals
 
 # Return propensity equations as an array
-# with an optional input (unused here)
+# with an optional external input (unused here)
 def propensities(s, _input):
     return jnp.array([BIRTH_RATE, DEATH_RATE * s.x])
 
@@ -86,8 +86,8 @@ def run_one(key):
         apply_reaction_fn=apply_reaction,
     )
 
-# Simulate 10 Gillespie trajectories
-states = run_one(jax.random.split(jax.random.PRNGKey(0), 10))
+# Simulate 100 Gillespie trajectories
+states = run_one(jax.random.split(jax.random.PRNGKey(0), 100))
 times = jnp.arange(1, 201) * 1.0
 ```
 
