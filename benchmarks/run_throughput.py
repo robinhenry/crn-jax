@@ -125,7 +125,7 @@ def _sweep(model_name: str, ns: list[int], libs: list[str], n_reps: int = DEFAUL
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--device", choices=["cpu", "gpu"], required=True)
-    p.add_argument("--models", nargs="*", default=["birth_death", "lotka_volterra", "linear_cascade"])
+    p.add_argument("--models", nargs="*", default=["birth_death", "linear_cascade"])
     p.add_argument("--n", nargs="*", type=int, default=None)
     p.add_argument("--out", type=Path, default=None)
     p.add_argument("--reps", type=int, default=DEFAULT_REPS,

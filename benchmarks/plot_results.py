@@ -45,15 +45,13 @@ SHORT_LABELS = {
 }
 SPECIES_LABELS = {
     "birth_death": ["X"],
-    "lotka_volterra": ["Prey", "Predator"],
     "linear_cascade": [f"A{i+1}" for i in range(10)],
 }
 MODEL_TITLES = {
     "birth_death": "Birth-death (1 species, 2 reactions)",
-    "lotka_volterra": "Lotka-Volterra (2 species, 3 reactions)",
     "linear_cascade": "Linear cascade (10 species, 20 reactions)",
 }
-MODELS = ["birth_death", "lotka_volterra", "linear_cascade"]
+MODELS = ["birth_death", "linear_cascade"]
 
 
 # ---------- correctness ----------------------------------------------------
@@ -78,10 +76,7 @@ def plot_correctness(model_name: str):
         ax = axes[i]
         all_vals = np.concatenate([data["crn_jax"][:, i], data["gillespy2"][:, i]])
 
-        if model_name == "lotka_volterra":
-            hi = np.quantile(all_vals, 0.995)
-        else:
-            hi = all_vals.max()
+        hi = all_vals.max()
         lo = all_vals.min()
 
         span = max(1, int(hi - lo))
@@ -220,11 +215,9 @@ def plot_speedup_bars(rows_by_series):
     TEXT_DARK = "#c9d1d9"
     GRID_COLOR = (127 / 255, 127 / 255, 127 / 255, 0.25)
 
-    plot_models = [m for m in MODELS if m != "lotka_volterra"]
-
     # Build ordered rows: (label, seconds, is_hero).
     rows_data: list[tuple[str, float, bool]] = []
-    for model in plot_models:
+    for model in MODELS:
         peaks = {}
         for s in series_order:
             all_r = [r for r in rows_by_series.get(s, []) if r["model"] == model]
@@ -312,13 +305,19 @@ def plot_speedup_bars(rows_by_series):
         fig.savefig(out, format="svg", bbox_inches="tight", transparent=True)
         plt.close(fig)
 
-    # Post-process: swap matplotlib's font-family for the ruff Apple-system
-    # stack, then emit a dark-mode sibling by switching the text fill colour.
+    # Post-process: (1) GitHub's markdown sanitiser rejects SVGs that declare
+    # an external DTD, so drop the DOCTYPE and RDF metadata block; (2) drop
+    # the ``pt`` unit from width/height (VS Code's preview mis-sizes them);
+    # (3) swap matplotlib's font-family for the ruff Apple-system stack.
+    # Then emit a dark-mode sibling by switching the text fill colour.
     ruff_font = (
         '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,'
         'sans-serif,"Apple Color Emoji","Segoe UI Emoji"'
     )
     svg = out.read_text()
+    svg = re.sub(r'<!DOCTYPE[^>]*>\s*', "", svg)
+    svg = re.sub(r"<metadata>.*?</metadata>\s*", "", svg, flags=re.DOTALL)
+    svg = re.sub(r'(width|height)="([\d.]+)pt"', r'\1="\2"', svg)
     svg = re.sub(r'font-family:[^;"\']+', f"font-family:{ruff_font}", svg)
     svg = re.sub(
         r'font-family="[^"]*"', f'font-family="{ruff_font}"', svg,

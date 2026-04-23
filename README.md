@@ -18,15 +18,25 @@ Chemical reaction networks in JAX — a tiny, GPU-parallel Gillespie / Stochasti
 
 ```bash
 pip install crn-jax
+
 # with NVIDIA GPU support:
 pip install "crn-jax[cuda]"
-# or, from source:
-pip install git+https://github.com/robinhenry/crn-jax
+
 # for local development:
 git clone https://github.com/robinhenry/crn-jax && cd crn-jax && pip install -e ".[test,examples]"
 ```
 
 `crn-jax` depends on `jax` / `jaxlib` only. 
+
+## Key features
+
+- 🎯 **Exact SSA** — pure-JAX implementation of the Gillespie algorithm for chemical reaction networks.
+- ⚡ **JIT-compiled** — the entire loop compiles under `jax.jit`.
+- 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
+- ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
+- 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
+- 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
+
 
 ## Quickstart
 
@@ -77,15 +87,6 @@ times = jnp.arange(1, 201) * 1.0
 
 See the [examples](examples/) folder for more detailed examples.
 
-## Key features
-
-- 🎯 **Exact SSA** — pure-JAX implementation of the Gillespie algorithm for chemical reaction networks.
-- ⚡ **JIT-compiled** — the entire loop compiles under `jax.jit`.
-- 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
-- ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
-- 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
-- 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
-
 ## API
 
 ```python
@@ -108,8 +109,6 @@ from crn_jax.kinetics import hill_function, sample_lognormal
 | `simulate_interval`   | You're driving the system yourself, one step at a time (e.g. an RL rollout). |
 | `simulate_until`      | You need a custom state shape or a non-uniform time grid. Fully generic.     |
 | `plot_trajectories`   | Quick look at the output.                                                    |
-
-`simulate_trajectory` and `simulate_interval` assume the state exposes `time`, `next_reaction_time`, and a `_replace` method (`NamedTuple`, Flax struct dataclass, Equinox module, …). `simulate_until` has no such requirement — you pass `get_time_fn` / `update_time_fn` callbacks instead.
 
 ## See Also
 

@@ -8,7 +8,7 @@ scripts can treat all libraries uniformly.
 
 import importlib
 
-MODEL_NAMES = ("birth_death", "lotka_volterra", "linear_cascade")
+MODEL_NAMES = ("birth_death", "linear_cascade")
 
 
 def get(name: str):

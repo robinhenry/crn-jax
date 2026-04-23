@@ -9,8 +9,7 @@ Statistical tests
 - 2-sample Kolmogorov-Smirnov per species — gate of distribution equality.
   Critical value at level α=0.001 is c(α)·sqrt((n+m)/(nm)) ≈ 1.95·sqrt(2/N).
   At N=10 000 → KS_crit ≈ 0.028.
-- Wasserstein-1 distance per species — informational; sensitive to tails (good
-  for heavy-tailed distributions like Lotka-Volterra).
+- Wasserstein-1 distance per species — informational; sensitive to tails.
 - |Δmean| / max(|mean|) — interpretable physical sanity check; gate at 5%.
 
 PASS requires KS test passes for every species AND mean within tolerance for
