@@ -148,6 +148,12 @@ def simulate_until(
         pending_reaction_time = jnp.where(input_changed, jnp.array(jnp.inf), pending_reaction_time)
 
     # Sample an initial reaction time if we don't have one carried over.
+    # ``initial_propensities`` are also used as the pre-reaction propensities
+    # for the first loop iteration, then threaded through the carry so each
+    # subsequent iteration does one propensity evaluation (post-reaction)
+    # instead of two. This assumes propensities depend only on the mutable
+    # state fields (typically state.x), not on state.time — the standard
+    # assumption for the Gillespie direct method on autonomous CRNs.
     initial_time = get_time_fn(initial_state)
     key, key_init = jax.random.split(key)
     needs_sample = jnp.isinf(pending_reaction_time)
@@ -156,32 +162,32 @@ def simulate_until(
     next_reaction_time = jnp.where(needs_sample, initial_time + sampled_tau, pending_reaction_time)
 
     def cond_fn(carry):
-        state, next_rxn_time, step, key = carry
+        state, next_rxn_time, propensities, step, key = carry
         return (next_rxn_time < target_time) & (step < max_steps)
 
     def body_fn(carry):
-        state, next_rxn_time, step, key = carry
+        state, next_rxn_time, propensities, step, key = carry
         key, key_reaction, key_time = jax.random.split(key, 3)
 
         # Advance time to when the reaction occurs.
         state = update_time_fn(state, next_rxn_time)
 
-        # Sample which reaction (using pre-reaction propensities) and apply it.
-        propensities = compute_propensities_fn(state, input)
+        # Sample which reaction using the carried pre-reaction propensities.
         reaction_idx = sample_reaction(key_reaction, propensities)
         state = apply_reaction_fn(state, reaction_idx)
 
-        # Post-reaction propensities have changed; sample the next tau.
+        # Compute post-reaction propensities once; they are both the sampling
+        # distribution for tau and the carry for the next iteration.
         new_propensities = compute_propensities_fn(state, input)
         tau = sample_tau(key_time, new_propensities)
         new_next_rxn_time = get_time_fn(state) + tau
 
-        return state, new_next_rxn_time, step + 1, key
+        return state, new_next_rxn_time, new_propensities, step + 1, key
 
-    final_state, final_next_rxn_time, _, _ = jax.lax.while_loop(
+    final_state, final_next_rxn_time, _, _, _ = jax.lax.while_loop(
         cond_fn,
         body_fn,
-        (initial_state, next_reaction_time, jnp.array(0), key),
+        (initial_state, next_reaction_time, initial_propensities, jnp.array(0), key),
     )
 
     return final_state, final_next_rxn_time

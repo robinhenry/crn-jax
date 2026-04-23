@@ -2,11 +2,11 @@
 name = "crn-jax-benchmarks"
 version = "0.0.0"
 description = "Benchmarking crn-jax against GillesPy2 and jax-smfsb."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "gillespy2>=1.9",
-    "matplotlib>=3.7",
-    "numpy>=1.24",
+    "gillespy2>=1.8",
+    "matplotlib>=3.10",
+    "numpy>=2.0",
     "pandas>=2.0",
 ]
 

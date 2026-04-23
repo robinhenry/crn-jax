@@ -32,10 +32,15 @@ Chemical reaction networks in JAX — a tiny, GPU-optimized Gillespie / Stochast
 pip install crn-jax
 
 # with NVIDIA GPU support:
-pip install "crn-jax[cuda]"
+pip install crn-jax "jax[cuda12]"
 
-# for local development:
-git clone https://github.com/robinhenry/crn-jax && cd crn-jax && pip install -e ".[test,examples]"
+# with plotting helpers:
+pip install "crn-jax[examples]"
+
+# for local development (uses Poetry):
+git clone https://github.com/robinhenry/crn-jax && cd crn-jax
+poetry install                    # main deps + dev tools
+poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 ```
 
 `crn-jax` depends on `jax` / `jaxlib` only.

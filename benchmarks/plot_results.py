@@ -354,6 +354,11 @@ def plot_throughput_scaling(rows_by_series):
     Shows that GillesPy2 saturates near a per-trajectory cost while
     crn-jax GPU keeps climbing until vmap saturates the device or memory runs
     out (≥1M trajectories on the simpler models).
+
+    For ``(crn_jax, gpu)`` we also draw a dashed "compute only" line using
+    ``traj_per_s_compute`` (ends at ``block_until_ready``, excludes the D→H
+    copy). The gap between the solid and dashed lines at large N is the
+    device→host transfer tax on the total metric.
     """
     series_order = [("gillespy2", "cpu"), ("crn_jax", "cpu"), ("crn_jax", "gpu")]
 
@@ -385,6 +390,23 @@ def plot_throughput_scaling(rows_by_series):
                 markeredgewidth=1.0,
                 zorder=3,
             )
+            if s == ("crn_jax", "gpu"):
+                tps_compute = [r.get("traj_per_s_compute") for r in rows]
+                if all(v is not None for v in tps_compute):
+                    ax.plot(
+                        ns,
+                        tps_compute,
+                        "o--",
+                        color=COLORS[s],
+                        label="crn-jax (GPU, compute only)",
+                        lw=2.0,
+                        markersize=5,
+                        markerfacecolor="white",
+                        markeredgecolor=COLORS[s],
+                        markeredgewidth=1.6,
+                        alpha=0.85,
+                        zorder=3,
+                    )
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_title(MODEL_TITLES[model], fontsize=11, pad=10)
