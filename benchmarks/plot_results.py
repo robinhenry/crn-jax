@@ -198,13 +198,13 @@ def _style_axes(ax):
 
 
 def plot_speedup_bars(rows_by_series):
-    """Ruff-README-style horizontal bar chart, exported as SVG.
+    """Ruff-README-style horizontal bar charts — one SVG per model.
 
-    Matches the visual style of
-    https://github.com/astral-sh/ruff/blob/main/scripts/benchmarks/graph-spec.json:
-    single panel, one row per (tool, model), uniform ``#E15759`` bars,
-    bold hero rows, very thin bars, light vertical gridlines, transparent
-    background, Apple-system font stack.
+    Each chart is a standalone mini plot: a subtitle (model name), two
+    horizontal bars (crn-jax GPU hero + GillesPy2 CPU competitor), uniform
+    ``#E15759`` bars, bold hero row, light vertical gridlines, transparent
+    background, Apple-system font stack. Also emits a dark-mode sibling for
+    each via a text-colour swap.
     """
     import re
     from matplotlib.ticker import FuncFormatter, MaxNLocator
@@ -214,34 +214,10 @@ def plot_speedup_bars(rows_by_series):
     TEXT_LIGHT = "#333333"
     TEXT_DARK = "#c9d1d9"
     GRID_COLOR = (127 / 255, 127 / 255, 127 / 255, 0.25)
-
-    # Build ordered rows: (label, seconds, is_hero).
-    rows_data: list[tuple[str, float, bool]] = []
-    for model in MODELS:
-        peaks = {}
-        for s in series_order:
-            all_r = [r for r in rows_by_series.get(s, []) if r["model"] == model]
-            if all_r:
-                peaks[s] = max(all_r, key=lambda r: r["traj_per_s"])
-        if len(peaks) != len(series_order):
-            continue
-        model_friendly = model.replace("_", " ")
-        for s in series_order:
-            seconds = 1_000_000 / peaks[s]["traj_per_s"]
-            tool_short = "crn-jax (GPU)" if s[0] == "crn_jax" else "GillesPy2 (CPU)"
-            rows_data.append((
-                f"{tool_short}  ·  {model_friendly}",
-                seconds,
-                s[0] == "crn_jax",
-            ))
-
-    if not rows_data:
-        return
-
-    values = [r[1] for r in rows_data]
-    labels = [r[0] for r in rows_data]
-    heroes = [r[2] for r in rows_data]
-    max_v = max(values)
+    RUFF_FONT = (
+        "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,"
+        "sans-serif,'Apple Color Emoji','Segoe UI Emoji'"
+    )
 
     def _fmt(v: float) -> str:
         if v < 1:
@@ -250,89 +226,115 @@ def plot_speedup_bars(rows_by_series):
             return f"{v:.1f}s"
         return f"{v:.0f}s"
 
-    # Force matplotlib to emit <text> elements (not paths) in the SVG so we
-    # can swap the font-family afterwards.
-    with plt.rc_context({
-        "svg.fonttype": "none",
-        "font.family": "sans-serif",
-        "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
-    }):
-        fig, ax = plt.subplots(figsize=(9.0, 0.45 * len(rows_data) + 0.6))
-        fig.patch.set_alpha(0)
-        ax.patch.set_alpha(0)
+    def _clean_svg(text: str) -> str:
+        """Apply GitHub/VS-Code-safe post-processing to raw matplotlib SVG."""
+        text = re.sub(r"<!DOCTYPE[^>]*>\s*", "", text)
+        text = re.sub(r"<metadata>.*?</metadata>\s*", "", text, flags=re.DOTALL)
+        text = re.sub(r'(width|height)="([\d.]+)pt"', r'\1="\2"', text)
+        text = re.sub(r'font-family:[^;"]*', f"font-family:{RUFF_FONT}", text)
+        text = re.sub(r'font-family="[^"]*"', f'font-family="{RUFF_FONT}"', text)
+        return text
 
-        ys = np.arange(len(rows_data))
-        ax.barh(
-            ys, values,
-            height=0.42,
-            color=BAR_COLOR,
-            edgecolor="none",
-            zorder=3,
-        )
+    tool_labels = [
+        "crn-jax (GPU)" if s[0] == "crn_jax" else "GillesPy2 (CPU)"
+        for s in series_order
+    ]
 
-        ax.set_yticks(ys)
-        ax.set_yticklabels(labels)
-        for lbl, hero in zip(ax.get_yticklabels(), heroes):
-            lbl.set_fontsize(12)
-            lbl.set_color(TEXT_LIGHT)
-            lbl.set_fontweight("bold" if hero else "normal")
-        ax.invert_yaxis()
+    for model in MODELS:
+        peaks = {}
+        for s in series_order:
+            all_r = [r for r in rows_by_series.get(s, []) if r["model"] == model]
+            if all_r:
+                peaks[s] = max(all_r, key=lambda r: r["traj_per_s"])
+        if len(peaks) != len(series_order):
+            continue
+        values = [1_000_000 / peaks[s]["traj_per_s"] for s in series_order]
+        heroes = [s[0] == "crn_jax" for s in series_order]
+        max_v = max(values)
 
-        for y_pos, v, hero in zip(ys, values, heroes):
-            ax.text(
-                v, y_pos, f"  {_fmt(v)}",
-                ha="left", va="center",
-                fontsize=12, color=TEXT_LIGHT,
-                fontweight="bold" if hero else "normal",
+        with plt.rc_context({
+            "svg.fonttype": "none",
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
+        }):
+            # Narrow enough that two charts fit side-by-side inside a GitHub
+            # README content column.
+            fig, ax = plt.subplots(figsize=(5.2, 1.55))
+            fig.patch.set_alpha(0)
+            ax.patch.set_alpha(0)
+
+            ys = np.arange(len(values))
+            ax.barh(
+                ys, values,
+                height=0.42,
+                color=BAR_COLOR,
+                edgecolor="none",
+                zorder=3,
+            )
+            ax.set_yticks(ys)
+            ax.set_yticklabels(tool_labels)
+            for lbl, hero in zip(ax.get_yticklabels(), heroes):
+                lbl.set_fontsize(12)
+                lbl.set_color(TEXT_LIGHT)
+                lbl.set_fontweight("bold" if hero else "normal")
+            ax.invert_yaxis()
+            ax.set_title(
+                MODEL_TITLES[model],
+                fontsize=12, loc="left", pad=6, color=TEXT_LIGHT,
+                fontweight="bold",
             )
 
-        ax.set_xlim(0, max_v * 1.12)
-        ax.xaxis.set_major_locator(MaxNLocator(nbins=3, integer=True))
-        ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x)}s"))
+            for y_pos, v, hero in zip(ys, values, heroes):
+                # Fixed offset in points so the gap looks the same regardless
+                # of x-axis scale — `"  "`-padding shrinks on wide axes.
+                ax.annotate(
+                    _fmt(v),
+                    xy=(v, y_pos), xytext=(6, 0),
+                    textcoords="offset points",
+                    ha="left", va="center",
+                    fontsize=12, color=TEXT_LIGHT,
+                    fontweight="bold" if hero else "normal",
+                )
 
-        ax.grid(True, axis="x", which="major", color=GRID_COLOR, lw=1.0, zorder=0)
-        ax.grid(False, axis="y")
+            ax.set_xlim(0, max_v * 1.12)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=3, integer=True))
+            ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x)}s"))
+            ax.grid(True, axis="x", which="major", color=GRID_COLOR, lw=1.0, zorder=0)
+            ax.grid(False, axis="y")
 
-        for spine in ("top", "right", "left", "bottom"):
-            ax.spines[spine].set_visible(False)
-        ax.tick_params(axis="y", length=0, pad=10)
-        ax.tick_params(axis="x", length=0, pad=6, labelsize=12, colors=TEXT_LIGHT)
-        ax.set_axisbelow(True)
+            for spine in ("top", "right", "left", "bottom"):
+                ax.spines[spine].set_visible(False)
+            ax.tick_params(axis="y", length=0, pad=10)
+            ax.tick_params(axis="x", length=0, pad=6, labelsize=12, colors=TEXT_LIGHT)
+            ax.set_axisbelow(True)
 
-        fig.tight_layout()
+            fig.tight_layout()
 
-        out = FIGURES_DIR / "throughput_speedup.svg"
-        fig.savefig(out, format="svg", bbox_inches="tight", transparent=True)
-        plt.close(fig)
+            out = FIGURES_DIR / f"throughput_speedup_{model}.svg"
+            # Don't use ``bbox_inches="tight"`` — it would crop each SVG to
+            # its own content, giving the per-model charts different aspect
+            # ratios (so they misalign when placed side-by-side at equal
+            # width in the README). tight_layout() handles internal spacing.
+            fig.savefig(out, format="svg", transparent=True)
+            plt.close(fig)
 
-    # Post-process: (1) GitHub's markdown sanitiser rejects SVGs that declare
-    # an external DTD, so drop the DOCTYPE and RDF metadata block; (2) drop
-    # the ``pt`` unit from width/height (VS Code's preview mis-sizes them);
-    # (3) swap matplotlib's font-family for the ruff Apple-system stack.
-    # Then emit a dark-mode sibling by switching the text fill colour.
-    ruff_font = (
-        '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,'
-        'sans-serif,"Apple Color Emoji","Segoe UI Emoji"'
-    )
-    svg = out.read_text()
-    svg = re.sub(r'<!DOCTYPE[^>]*>\s*', "", svg)
-    svg = re.sub(r"<metadata>.*?</metadata>\s*", "", svg, flags=re.DOTALL)
-    svg = re.sub(r'(width|height)="([\d.]+)pt"', r'\1="\2"', svg)
-    svg = re.sub(r'font-family:[^;"\']+', f"font-family:{ruff_font}", svg)
-    svg = re.sub(
-        r'font-family="[^"]*"', f'font-family="{ruff_font}"', svg,
-    )
-    out.write_text(svg)
-    print(f"  wrote {out.name}")
+        svg = _clean_svg(out.read_text())
+        out.write_text(svg)
+        print(f"  wrote {out.name}")
 
-    dark_out = FIGURES_DIR / "throughput_speedup_dark.svg"
-    dark_out.write_text(svg.replace(TEXT_LIGHT, TEXT_DARK))
-    print(f"  wrote {dark_out.name}")
+        dark_out = FIGURES_DIR / f"throughput_speedup_{model}_dark.svg"
+        dark_out.write_text(svg.replace(TEXT_LIGHT, TEXT_DARK))
+        print(f"  wrote {dark_out.name}")
 
-    # Remove the stale PNG if it exists so the README only has one source.
-    old_png = FIGURES_DIR / "throughput_speedup.png"
-    if old_png.exists():
-        old_png.unlink()
+    # Remove the old combined files so nothing stale is left behind.
+    for fname in (
+        "throughput_speedup.svg",
+        "throughput_speedup_dark.svg",
+        "throughput_speedup.png",
+    ):
+        p = FIGURES_DIR / fname
+        if p.exists():
+            p.unlink()
 
 
 def plot_throughput_scaling(rows_by_series):

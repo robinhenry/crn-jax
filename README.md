@@ -3,15 +3,21 @@
 Chemical reaction networks in JAX — a tiny, GPU-parallel Gillespie / Stochastic Simulation Algorithm (SSA) library.
 
 <p align="center">
-  <picture align="center">
-    <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/throughput_speedup_dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="benchmarks/figures/throughput_speedup.svg">
-    <img alt="Gillespie SSA throughput: crn-jax on GPU vs GillesPy2 (C++) on CPU." src="benchmarks/figures/throughput_speedup.svg">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/throughput_speedup_birth_death_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="benchmarks/figures/throughput_speedup_birth_death.svg">
+    <img alt="Birth-death benchmark: crn-jax on GPU vs GillesPy2 (C++) on CPU." src="benchmarks/figures/throughput_speedup_birth_death.svg" width="48%">
+  </picture>
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/throughput_speedup_linear_cascade_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="benchmarks/figures/throughput_speedup_linear_cascade.svg">
+    <img alt="Linear-cascade benchmark: crn-jax on GPU vs GillesPy2 (C++) on CPU." src="benchmarks/figures/throughput_speedup_linear_cascade.svg" width="48%">
   </picture>
 </p>
 
 <p align="center">
-  <i>Wall-time to simulate 1&nbsp;000&nbsp;000 Gillespie trajectories (CPU vs RTX 5090 GPU).</i>
+  <i>Wall-time to simulate 1,000,000 independent stochastic trajectories — each a full Gillespie run of the reaction network from t=0 to t=20, sampled at 200 time points (CPU vs RTX 5090 GPU).</i>
 </p>
 
 ## Install
