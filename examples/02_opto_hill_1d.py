@@ -22,21 +22,20 @@ import matplotlib.pyplot as plt
 from crn_jax import simulate_trajectory
 from crn_jax.kinetics import hill_function
 
-
 # --- Model parameters --------------------------------------------------------
-K_PROD = 5.0     # max production rate (molecules / min)
-K_HILL = 0.5     # half-max light input
-N_HILL = 2.0     # Hill coefficient
-K_DEG = 0.05     # first-order degradation rate
+K_PROD = 5.0  # max production rate (molecules / min)
+K_HILL = 0.5  # half-max light input
+N_HILL = 2.0  # Hill coefficient
+K_DEG = 0.05  # first-order degradation rate
 # Steady states: U=0 → ⟨X⟩ = 0; U=1 → ⟨X⟩ = K_PROD·hill(1)/K_DEG ≈ 80.
 
-DT = 5.0            # sampling interval (min)
-N_STEPS = 120       # 120 × 5 min = 10 hours
-N_REPLICATES = 6    # laid out as a 2 × 3 grid of subplots
+DT = 5.0  # sampling interval (min)
+N_STEPS = 120  # 120 × 5 min = 10 hours
+N_REPLICATES = 6  # laid out as a 2 × 3 grid of subplots
 
 # Per-replicate priors: initial molecule count and light step-on time.
-X0_RANGE = (0.0, 20.0)            # uniform (molecules)
-STEP_TIME_RANGE = (30.0, 300.0)   # uniform (min) — when each replicate's light turns on
+X0_RANGE = (0.0, 20.0)  # uniform (molecules)
+STEP_TIME_RANGE = (30.0, 300.0)  # uniform (min) — when each replicate's light turns on
 
 
 # --- State and reactions -----------------------------------------------------
@@ -64,7 +63,8 @@ def apply_reaction(state: State, j: jax.Array) -> State:
 
 # --- Per-replicate configuration ---------------------------------------------
 def _sample_configs(
-    key: jax.Array, n_replicates: int,
+    key: jax.Array,
+    n_replicates: int,
 ) -> tuple[jax.Array, State, jax.Array]:
     """Draw ``n`` independent (sim_key, initial_state, input_schedule) triples.
 
@@ -84,11 +84,17 @@ def _sample_configs(
     # Random per-replicate step-on times. Each replicate's light schedule is
     # simply U=0 before its step-time and U=1 afterwards (one transition).
     step_times = jax.random.uniform(
-        k_step, (n_replicates,), minval=STEP_TIME_RANGE[0], maxval=STEP_TIME_RANGE[1],
+        k_step,
+        (n_replicates,),
+        minval=STEP_TIME_RANGE[0],
+        maxval=STEP_TIME_RANGE[1],
     )
-    interval_starts = jnp.arange(N_STEPS) * DT                       # (N_STEPS,)
-    us = jnp.where(interval_starts[None, :] >= step_times[:, None],  # (n, N_STEPS)
-                   1.0, 0.0)
+    interval_starts = jnp.arange(N_STEPS) * DT  # (N_STEPS,)
+    us = jnp.where(
+        interval_starts[None, :] >= step_times[:, None],  # (n, N_STEPS)
+        1.0,
+        0.0,
+    )
 
     # One independent simulation key per replicate.
     sim_keys = jax.random.split(k_sim, n_replicates)
@@ -98,9 +104,12 @@ def _sample_configs(
 
 # --- Simulation --------------------------------------------------------------
 def _simulate(
-    keys: jax.Array, initial_states: State, inputs: jax.Array,
+    keys: jax.Array,
+    initial_states: State,
+    inputs: jax.Array,
 ) -> tuple[jax.Array, jax.Array]:
     """Run one trajectory per replicate, vmapping over ALL per-replicate inputs."""
+
     # vmap's default in_axes=0 maps over axis 0 of every argument, including
     # every leaf of the `initial_states` PyTree. Each replicate therefore sees
     # a scalar `State` and a (N_STEPS,) `inputs` array — exactly what a
@@ -133,7 +142,11 @@ def _plot(times: jax.Array, us: jax.Array, xs: jax.Array, path: str | Path) -> N
     n_cols = 3
     n_rows = (n + n_cols - 1) // n_cols
     fig, axes = plt.subplots(
-        n_rows, n_cols, figsize=(12, 5), sharex=True, sharey=True,
+        n_rows,
+        n_cols,
+        figsize=(12, 5),
+        sharex=True,
+        sharey=True,
     )
 
     # Extend `us` by one step (repeat last value) so it aligns with the
@@ -144,15 +157,19 @@ def _plot(times: jax.Array, us: jax.Array, xs: jax.Array, path: str | Path) -> N
     # Per-replicate step-on time = start of the first interval where U = 1.
     # `argmax` returns the first True index (all-zero rows would map to 0, but
     # our STEP_TIME_RANGE guarantees a transition within every trajectory).
-    first_on_idx = jnp.argmax(us, axis=1)                 # (n,)
-    step_times = jnp.asarray(times[:-1])[first_on_idx]    # (n,)
+    first_on_idx = jnp.argmax(us, axis=1)  # (n,)
+    step_times = jnp.asarray(times[:-1])[first_on_idx]  # (n,)
 
     for i, ax in enumerate(axes.flat):
         # Orange shading wherever that replicate's light was on (U = 1).
         ax.fill_between(
-            times, 0, y_max,
+            times,
+            0,
+            y_max,
             where=(us_padded[i] > 0.5),
-            step="post", color="tab:orange", alpha=0.25,
+            step="post",
+            color="tab:orange",
+            alpha=0.25,
         )
         # The X(t) trajectory on top.
         ax.step(times, xs[i], where="post", color="tab:blue", lw=1.3)
@@ -164,7 +181,9 @@ def _plot(times: jax.Array, us: jax.Array, xs: jax.Array, path: str | Path) -> N
 
     # Single legend across the figure explaining the orange shading.
     orange_patch = mpatches.Patch(
-        color="tab:orange", alpha=0.25, label="light on (U = 1)",
+        color="tab:orange",
+        alpha=0.25,
+        label="light on (U = 1)",
     )
     fig.legend(handles=[orange_patch], loc="upper right", frameon=False)
     fig.suptitle(

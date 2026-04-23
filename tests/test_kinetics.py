@@ -54,7 +54,7 @@ def test_lognormal_mean_approx():
     keys = jax.random.split(jax.random.PRNGKey(0), 10_000)
     samples = jax.vmap(lambda k: sample_lognormal(k, mu, sigma))(keys)
     empirical_mean = float(jnp.mean(samples))
-    expected = float(jnp.exp(mu + sigma ** 2 / 2))
+    expected = float(jnp.exp(mu + sigma**2 / 2))
     # Within 3% for 10k samples.
     assert abs(empirical_mean - expected) / expected < 0.03
 

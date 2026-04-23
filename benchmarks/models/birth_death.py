@@ -100,6 +100,7 @@ def _get_gillespy2():
     global _gillespy2_cache
     if _gillespy2_cache is None:
         from gillespy2 import SSACSolver
+
         model = _build_gillespy2_model()
         # SSACSolver compiles a C++ binary on construction — the equivalent of
         # JIT for the JAX runner — so we cache it for fair per-call timing.

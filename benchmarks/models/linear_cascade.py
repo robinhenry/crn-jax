@@ -25,9 +25,9 @@ from crn_jax import simulate_trajectory
 N_SPECIES = 10
 
 PARAMS = dict(
-    source_rate=10.0,    # λ
-    conv_rate=1.0,       # k (A_i -> A_(i+1))
-    decay_rate=0.2,      # d (A_i -> ∅)
+    source_rate=10.0,  # λ
+    conv_rate=1.0,  # k (A_i -> A_(i+1))
+    decay_rate=0.2,  # d (A_i -> ∅)
     n_species=N_SPECIES,
     t_final=20.0,
     dt=0.1,
@@ -57,8 +57,8 @@ def _propensities(state: _State, _input: jax.Array) -> jax.Array:
     lam, k, d = PARAMS["source_rate"], PARAMS["conv_rate"], PARAMS["decay_rate"]
     # Order: [source, conv_1->2, conv_2->3, ..., conv_9->10, decay_1, ..., decay_10]
     source = jnp.array([lam])
-    convs = k * state.x[:-1]      # 9 conversions (uses A1..A9)
-    decays = d * state.x          # 10 decays
+    convs = k * state.x[:-1]  # 9 conversions (uses A1..A9)
+    decays = d * state.x  # 10 decays
     return jnp.concatenate([source, convs, decays])
 
 
@@ -130,14 +130,14 @@ def _build_gillespy2_model():
     p_k = gillespy2.Parameter(name="k", expression=str(k))
     p_d = gillespy2.Parameter(name="d", expression=str(d))
     model.add_parameter([p_lam, p_k, p_d])
-    species = [gillespy2.Species(name=f"A{i+1}", initial_value=0) for i in range(n)]
+    species = [gillespy2.Species(name=f"A{i + 1}", initial_value=0) for i in range(n)]
     model.add_species(species)
     rxns = []
     rxns.append(gillespy2.Reaction(name="source", rate=p_lam, reactants={}, products={species[0]: 1}))
     for i in range(n - 1):
         rxns.append(
             gillespy2.Reaction(
-                name=f"conv_{i+1}_{i+2}",
+                name=f"conv_{i + 1}_{i + 2}",
                 rate=p_k,
                 reactants={species[i]: 1},
                 products={species[i + 1]: 1},
@@ -146,7 +146,7 @@ def _build_gillespy2_model():
     for i in range(n):
         rxns.append(
             gillespy2.Reaction(
-                name=f"decay_{i+1}",
+                name=f"decay_{i + 1}",
                 rate=p_d,
                 reactants={species[i]: 1},
                 products={},
@@ -164,6 +164,7 @@ def _get_gillespy2():
     global _gillespy2_cache
     if _gillespy2_cache is None:
         from gillespy2 import SSACSolver
+
         model = _build_gillespy2_model()
         _gillespy2_cache = (model, SSACSolver(model=model))
     return _gillespy2_cache
@@ -171,15 +172,8 @@ def _get_gillespy2():
 
 def run_gillespy2(seed: int, n_trajectories: int, *, return_full_trajectory: bool = False):
     model, solver = _get_gillespy2()
-    results = model.run(
-        solver=solver, number_of_trajectories=n_trajectories, seed=int(seed) + 1
-    )
-    arr = np.stack(
-        [
-            np.stack([np.asarray(r[f"A{i+1}"]) for i in range(N_SPECIES)], axis=-1)
-            for r in results
-        ]
-    )
+    results = model.run(solver=solver, number_of_trajectories=n_trajectories, seed=int(seed) + 1)
+    arr = np.stack([np.stack([np.asarray(r[f"A{i + 1}"]) for i in range(N_SPECIES)], axis=-1) for r in results])
     if return_full_trajectory:
         return arr
     return arr[:, -1, :]

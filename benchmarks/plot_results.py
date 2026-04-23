@@ -30,22 +30,22 @@ FIGURES_DIR.mkdir(exist_ok=True)
 # darker red for GPU.
 COLORS = {
     ("gillespy2", "cpu"): "#1f77b4",
-    ("crn_jax", "cpu"):   "#ff7f0e",
-    ("crn_jax", "gpu"):   "#d62728",
+    ("crn_jax", "cpu"): "#ff7f0e",
+    ("crn_jax", "gpu"): "#d62728",
 }
 LABELS = {
     ("gillespy2", "cpu"): "GillesPy2 (CPU, C++)",
-    ("crn_jax", "cpu"):   "crn-jax (CPU)",
-    ("crn_jax", "gpu"):   "crn-jax (GPU)",
+    ("crn_jax", "cpu"): "crn-jax (CPU)",
+    ("crn_jax", "gpu"): "crn-jax (GPU)",
 }
 SHORT_LABELS = {
     ("gillespy2", "cpu"): "GillesPy2\nCPU",
-    ("crn_jax", "cpu"):   "crn-jax\nCPU",
-    ("crn_jax", "gpu"):   "crn-jax\nGPU",
+    ("crn_jax", "cpu"): "crn-jax\nCPU",
+    ("crn_jax", "gpu"): "crn-jax\nGPU",
 }
 SPECIES_LABELS = {
     "birth_death": ["X"],
-    "linear_cascade": [f"A{i+1}" for i in range(10)],
+    "linear_cascade": [f"A{i + 1}" for i in range(10)],
 }
 MODEL_TITLES = {
     "birth_death": "Birth-death (1 species, 2 reactions)",
@@ -111,12 +111,13 @@ def plot_correctness(model_name: str):
 # ---------- trajectory comparison ------------------------------------------
 def plot_trajectories_comparison(model_name: str, n_traj: int = 5):
     from benchmarks.models import get
+
     model = get(model_name)
     species_names = SPECIES_LABELS[model_name]
 
     print(f"  generating {n_traj} trajectories for {model_name}…", flush=True)
     runs = {
-        "crn_jax":   np.asarray(model.run_crn_jax(jax.random.PRNGKey(7), n_traj, return_full_trajectory=True)),
+        "crn_jax": np.asarray(model.run_crn_jax(jax.random.PRNGKey(7), n_traj, return_full_trajectory=True)),
         "gillespy2": np.asarray(model.run_gillespy2(42, n_traj, return_full_trajectory=True)),
     }
 
@@ -147,13 +148,17 @@ def plot_trajectories_comparison(model_name: str, n_traj: int = 5):
         ax = axes[col_i]
         for lib, color, label in [
             ("gillespy2", COLORS[("gillespy2", "cpu")], "GillesPy2"),
-            ("crn_jax",   COLORS[("crn_jax", "gpu")],   "crn-jax"),
+            ("crn_jax", COLORS[("crn_jax", "gpu")], "crn-jax"),
         ]:
             times, vals = _normalise(runs[lib])
             for t in range(n_traj):
                 ax.step(
-                    times, vals[t, :, sp_idx],
-                    color=color, alpha=0.6, lw=1.0, where="post",
+                    times,
+                    vals[t, :, sp_idx],
+                    color=color,
+                    alpha=0.6,
+                    lw=1.0,
+                    where="post",
                     label=label if t == 0 else None,
                 )
         ax.set_title(f"{labels[col_i]} — {n_traj} trajectories per library")
@@ -207,6 +212,7 @@ def plot_speedup_bars(rows_by_series):
     each via a text-colour swap.
     """
     import re
+
     from matplotlib.ticker import FuncFormatter, MaxNLocator
 
     series_order = [("crn_jax", "gpu"), ("gillespy2", "cpu")]
@@ -215,8 +221,7 @@ def plot_speedup_bars(rows_by_series):
     TEXT_DARK = "#c9d1d9"
     GRID_COLOR = (127 / 255, 127 / 255, 127 / 255, 0.25)
     RUFF_FONT = (
-        "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,"
-        "sans-serif,'Apple Color Emoji','Segoe UI Emoji'"
+        "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji'"
     )
 
     def _fmt(v: float) -> str:
@@ -235,10 +240,7 @@ def plot_speedup_bars(rows_by_series):
         text = re.sub(r'font-family="[^"]*"', f'font-family="{RUFF_FONT}"', text)
         return text
 
-    tool_labels = [
-        "crn-jax (GPU)" if s[0] == "crn_jax" else "GillesPy2 (CPU)"
-        for s in series_order
-    ]
+    tool_labels = ["crn-jax (GPU)" if s[0] == "crn_jax" else "GillesPy2 (CPU)" for s in series_order]
 
     for model in MODELS:
         peaks = {}
@@ -252,11 +254,13 @@ def plot_speedup_bars(rows_by_series):
         heroes = [s[0] == "crn_jax" for s in series_order]
         max_v = max(values)
 
-        with plt.rc_context({
-            "svg.fonttype": "none",
-            "font.family": "sans-serif",
-            "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
-        }):
+        with plt.rc_context(
+            {
+                "svg.fonttype": "none",
+                "font.family": "sans-serif",
+                "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
+            }
+        ):
             # Narrow enough that two charts fit side-by-side inside a GitHub
             # README content column.
             fig, ax = plt.subplots(figsize=(5.2, 1.55))
@@ -265,7 +269,8 @@ def plot_speedup_bars(rows_by_series):
 
             ys = np.arange(len(values))
             ax.barh(
-                ys, values,
+                ys,
+                values,
                 height=0.42,
                 color=BAR_COLOR,
                 edgecolor="none",
@@ -280,7 +285,10 @@ def plot_speedup_bars(rows_by_series):
             ax.invert_yaxis()
             ax.set_title(
                 MODEL_TITLES[model],
-                fontsize=12, loc="left", pad=6, color=TEXT_LIGHT,
+                fontsize=12,
+                loc="left",
+                pad=6,
+                color=TEXT_LIGHT,
                 fontweight="bold",
             )
 
@@ -289,10 +297,13 @@ def plot_speedup_bars(rows_by_series):
                 # of x-axis scale — `"  "`-padding shrinks on wide axes.
                 ax.annotate(
                     _fmt(v),
-                    xy=(v, y_pos), xytext=(6, 0),
+                    xy=(v, y_pos),
+                    xytext=(6, 0),
                     textcoords="offset points",
-                    ha="left", va="center",
-                    fontsize=12, color=TEXT_LIGHT,
+                    ha="left",
+                    va="center",
+                    fontsize=12,
+                    color=TEXT_LIGHT,
                     fontweight="bold" if hero else "normal",
                 )
 
@@ -347,7 +358,10 @@ def plot_throughput_scaling(rows_by_series):
     series_order = [("gillespy2", "cpu"), ("crn_jax", "cpu"), ("crn_jax", "gpu")]
 
     fig, axes = plt.subplots(
-        1, len(MODELS), figsize=(4.6 * len(MODELS), 3.8), squeeze=False,
+        1,
+        len(MODELS),
+        figsize=(4.6 * len(MODELS), 3.8),
+        squeeze=False,
     )
     axes = axes[0]
 
@@ -360,10 +374,15 @@ def plot_throughput_scaling(rows_by_series):
             ns = [r["n"] for r in rows]
             tps = [r["traj_per_s"] for r in rows]
             ax.plot(
-                ns, tps, "o-",
-                color=COLORS[s], label=LABELS[s],
-                lw=2.2, markersize=6,
-                markeredgecolor="white", markeredgewidth=1.0,
+                ns,
+                tps,
+                "o-",
+                color=COLORS[s],
+                label=LABELS[s],
+                lw=2.2,
+                markersize=6,
+                markeredgecolor="white",
+                markeredgewidth=1.0,
                 zorder=3,
             )
         ax.set_xscale("log")
@@ -373,19 +392,27 @@ def plot_throughput_scaling(rows_by_series):
         if ax is axes[0]:
             ax.set_ylabel("trajectories / sec  (T=20)", fontsize=10)
             ax.legend(
-                loc="upper left", fontsize=9,
-                frameon=True, framealpha=0.9, edgecolor="#cccccc",
+                loc="upper left",
+                fontsize=9,
+                frameon=True,
+                framealpha=0.9,
+                edgecolor="#cccccc",
             )
         ax.grid(
-            True, which="major",
-            linestyle=":", color="#bbbbbb", alpha=0.7, zorder=0,
+            True,
+            which="major",
+            linestyle=":",
+            color="#bbbbbb",
+            alpha=0.7,
+            zorder=0,
         )
         ax.grid(False, which="minor")
         _style_axes(ax)
 
     fig.suptitle(
         "Throughput scaling — crn-jax (GPU) reaches batch sizes that are infeasible on CPU",
-        fontsize=13, y=0.99,
+        fontsize=13,
+        y=0.99,
     )
     fig.tight_layout()
     out = FIGURES_DIR / "throughput_scaling.png"

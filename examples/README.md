@@ -1,6 +1,6 @@
 # crn-jax examples
 
-Each file is a self-contained, runnable script. 
+Each file is a self-contained, runnable script.
 
 | script | what it shows |
 |---|---|

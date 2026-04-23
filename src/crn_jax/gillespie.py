@@ -145,9 +145,7 @@ def simulate_until(
     # continuous inputs — a boolean XOR would silently cast floats to bool.
     if previous_input is not None:
         input_changed = jnp.any(jnp.asarray(previous_input) != jnp.asarray(input))
-        pending_reaction_time = jnp.where(
-            input_changed, jnp.array(jnp.inf), pending_reaction_time
-        )
+        pending_reaction_time = jnp.where(input_changed, jnp.array(jnp.inf), pending_reaction_time)
 
     # Sample an initial reaction time if we don't have one carried over.
     initial_time = get_time_fn(initial_state)
@@ -155,9 +153,7 @@ def simulate_until(
     needs_sample = jnp.isinf(pending_reaction_time)
     initial_propensities = compute_propensities_fn(initial_state, input)
     sampled_tau = sample_tau(key_init, initial_propensities)
-    next_reaction_time = jnp.where(
-        needs_sample, initial_time + sampled_tau, pending_reaction_time
-    )
+    next_reaction_time = jnp.where(needs_sample, initial_time + sampled_tau, pending_reaction_time)
 
     def cond_fn(carry):
         state, next_rxn_time, step, key = carry
@@ -311,10 +307,7 @@ def simulate_trajectory(
 
     inputs = jnp.asarray(inputs)
     if inputs.shape[0] != n_steps:
-        raise ValueError(
-            f"inputs leading dimension ({inputs.shape[0]}) must match "
-            f"n_steps ({n_steps})"
-        )
+        raise ValueError(f"inputs leading dimension ({inputs.shape[0]}) must match n_steps ({n_steps})")
 
     def body_with_input(carry, step):
         state, prev_input = carry
@@ -333,7 +326,5 @@ def simulate_trajectory(
 
     # Seeding prev_input with inputs[0] means the first step sees "no change"
     # and trusts the pending reaction stored in initial_state.
-    (_, _), states = jax.lax.scan(
-        body_with_input, (initial_state, inputs[0]), (keys, inputs)
-    )
+    (_, _), states = jax.lax.scan(body_with_input, (initial_state, inputs[0]), (keys, inputs))
     return states

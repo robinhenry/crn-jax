@@ -4,7 +4,7 @@ Reactions:
     ∅ -- λ   -->  X  (birth)
     X -- μ·x -->  ∅  (death)
 
-This example simulates 10 Gillespie trajectories and plots them against the 
+This example simulates 10 Gillespie trajectories and plots them against the
 steady-state mean λ/μ.
 """
 
@@ -16,14 +16,13 @@ import jax.numpy as jnp
 
 from crn_jax import plot_trajectories, simulate_trajectory
 
-
 # --- Model parameters --------------------------------------------------------
-BIRTH_RATE = 3.0   # λ
-DEATH_RATE = 0.1   # μ
+BIRTH_RATE = 3.0  # λ
+DEATH_RATE = 0.1  # μ
 # Steady-state distribution is Poisson(λ/μ) with mean = 30.
 
-DT = 1.0           # sampling interval (observations are recorded every DT)
-N_STEPS = 200      # number of sampling intervals per trajectory
+DT = 1.0  # sampling interval (observations are recorded every DT)
+N_STEPS = 200  # number of sampling intervals per trajectory
 N_REPLICATES = 10  # number of independent trajectories to simulate
 
 
@@ -91,7 +90,8 @@ def _simulate(key: jax.Array, n_replicates: int) -> tuple[jax.Array, jax.Array]:
 def _plot(times: jax.Array, xs: jax.Array, path: str | Path) -> None:
     # `plot_trajectories` accepts a (N, T) ensemble and step-plots each replicate.
     fig, ax = plot_trajectories(
-        times, xs,
+        times,
+        xs,
         ylabel="X (molecules)",
         title=f"Birth-death: {xs.shape[0]} trajectories (λ={BIRTH_RATE}, μ={DEATH_RATE})",
     )

@@ -20,9 +20,7 @@ class BirthDeathState(NamedTuple):
     next_reaction_time: jax.Array
 
 
-def birth_death_propensities(
-    state: BirthDeathState, input: jax.Array
-) -> jax.Array:
+def birth_death_propensities(state: BirthDeathState, input: jax.Array) -> jax.Array:
     """Birth at constant rate ``input[0]``, death at rate ``input[1] * x``.
 
     The ``input`` is a length-2 array of (birth_rate, death_rate) so the tests

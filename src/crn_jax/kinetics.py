@@ -43,7 +43,7 @@ def hill_function(
         K: Half-maximal concentration. At ``x == K`` the
             output is ``0.5``.
         n: Hill coefficient.
-    
+
     Returns:
         Hill-function value in ``[0, 1]``.
     """

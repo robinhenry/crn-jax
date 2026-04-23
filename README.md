@@ -38,7 +38,7 @@ pip install "crn-jax[cuda]"
 git clone https://github.com/robinhenry/crn-jax && cd crn-jax && pip install -e ".[test,examples]"
 ```
 
-`crn-jax` depends on `jax` / `jaxlib` only. 
+`crn-jax` depends on `jax` / `jaxlib` only.
 
 ## Key features
 

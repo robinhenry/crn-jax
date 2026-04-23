@@ -23,6 +23,7 @@ import sys
 import time
 from pathlib import Path
 
+
 # --- Platform selection: must run before `import jax` -----------------------
 def _early_device() -> str:
     for i, a in enumerate(sys.argv):
@@ -31,6 +32,7 @@ def _early_device() -> str:
         if a.startswith("--device="):
             return a.split("=", 1)[1]
     return "gpu"
+
 
 _DEVICE = _early_device()
 os.environ["JAX_PLATFORMS"] = "cpu" if _DEVICE == "cpu" else "cuda"
@@ -84,6 +86,7 @@ def _time_one(run_fn, key_or_seed_fn, n_traj, n_reps=DEFAULT_REPS, warmup=True):
 
 def _make_runners(model_name: str):
     from benchmarks.models import get
+
     model = get(model_name)
 
     # Apples-to-apples: both libraries produce a full (N, n_steps, n_species)
@@ -112,10 +115,20 @@ def _sweep(model_name: str, ns: list[int], libs: list[str], n_reps: int = DEFAUL
                 warm, med, q25, q75 = _time_one(run_fn, key_fn, n, n_reps=n_reps)
                 tps = n / med
                 jit_secs = max(0.0, (warm or med) - med)
-                print(f"  median={med*1000:8.1f}ms  ({tps:>10,.0f} traj/s)  JIT≈{jit_secs*1000:6.0f}ms")
-                rows.append(dict(model=model_name, lib=lib, n=n, warm_s=warm,
-                                 median_s=med, q25_s=q25, q75_s=q75,
-                                 traj_per_s=tps, jit_compile_s=jit_secs))
+                print(f"  median={med * 1000:8.1f}ms  ({tps:>10,.0f} traj/s)  JIT≈{jit_secs * 1000:6.0f}ms")
+                rows.append(
+                    dict(
+                        model=model_name,
+                        lib=lib,
+                        n=n,
+                        warm_s=warm,
+                        median_s=med,
+                        q25_s=q25,
+                        q75_s=q75,
+                        traj_per_s=tps,
+                        jit_compile_s=jit_secs,
+                    )
+                )
             except Exception as e:
                 print(f"  ERROR: {type(e).__name__}: {str(e)[:80]}")
                 rows.append(dict(model=model_name, lib=lib, n=n, error=str(e)))
@@ -128,16 +141,19 @@ def main():
     p.add_argument("--models", nargs="*", default=["birth_death", "linear_cascade"])
     p.add_argument("--n", nargs="*", type=int, default=None)
     p.add_argument("--out", type=Path, default=None)
-    p.add_argument("--reps", type=int, default=DEFAULT_REPS,
-                   help=f"timed reps per cell (default: {DEFAULT_REPS}, plus 1 untimed warmup)")
+    p.add_argument(
+        "--reps",
+        type=int,
+        default=DEFAULT_REPS,
+        help=f"timed reps per cell (default: {DEFAULT_REPS}, plus 1 untimed warmup)",
+    )
     args = p.parse_args()
 
     expected = "cpu" if args.device == "cpu" else "gpu"
     actual = jax.devices()[0].platform
     print(f"JAX devices: {jax.devices()}  (expected {expected})")
     assert (expected == "cpu") == (actual == "cpu"), (
-        f"JAX platform mismatch: requested {expected}, got {actual}. "
-        "JAX_PLATFORMS may have been set too late."
+        f"JAX platform mismatch: requested {expected}, got {actual}. JAX_PLATFORMS may have been set too late."
     )
 
     if args.n is None:

@@ -109,16 +109,28 @@ def _compare(model_name: str, n_trajectories: int, seed: int) -> dict:
         mean_ok_i = (dmean_rel < MEAN_REL_TOL) or (dmean < 4 * se_pooled)
         ks = _ks_2samp(x_tst, x_ref)
         w1 = _wasserstein1(x_tst, x_ref)
-        rows.append(dict(species=i, mean_ref=mean_ref, mean_tst=mean_tst,
-                         dmean=dmean, dmean_rel=dmean_rel, se_pooled=se_pooled,
-                         mean_ok=mean_ok_i, ks=ks, w1=w1))
+        rows.append(
+            dict(
+                species=i,
+                mean_ref=mean_ref,
+                mean_tst=mean_tst,
+                dmean=dmean,
+                dmean_rel=dmean_rel,
+                se_pooled=se_pooled,
+                mean_ok=mean_ok_i,
+                ks=ks,
+                w1=w1,
+            )
+        )
 
     print(f"  {'spec':>4s}  {'mean_ref':>10s}  {'mean_tst':>10s}  {'Δmean':>8s}  {'4·SE':>8s}  {'KS':>7s}  {'W1':>9s}")
     for r in rows:
         flag_mean = " " if r["mean_ok"] else "*"
         flag_ks = " " if r["ks"] < ks_crit else "*"
-        print(f"  {r['species']:>4d}  {r['mean_ref']:>10.3f}  {r['mean_tst']:>10.3f}  "
-              f"{r['dmean']:>8.3f}{flag_mean} {4*r['se_pooled']:>7.3f}  {r['ks']:>6.4f}{flag_ks}  {r['w1']:>9.4f}")
+        print(
+            f"  {r['species']:>4d}  {r['mean_ref']:>10.3f}  {r['mean_tst']:>10.3f}  "
+            f"{r['dmean']:>8.3f}{flag_mean} {4 * r['se_pooled']:>7.3f}  {r['ks']:>6.4f}{flag_ks}  {r['w1']:>9.4f}"
+        )
 
     mean_ok = all(r["mean_ok"] for r in rows)
     ks_ok = all(r["ks"] < ks_crit for r in rows)
@@ -131,8 +143,7 @@ def _compare(model_name: str, n_trajectories: int, seed: int) -> dict:
         crn_jax=finals["crn_jax"],
         gillespy2=finals["gillespy2"],
     )
-    return dict(name=model_name, n=n_trajectories, ok=ok,
-                mean_ok=mean_ok, ks_ok=ks_ok, ks_crit=ks_crit, rows=rows)
+    return dict(name=model_name, n=n_trajectories, ok=ok, mean_ok=mean_ok, ks_ok=ks_ok, ks_crit=ks_crit, rows=rows)
 
 
 def main():
