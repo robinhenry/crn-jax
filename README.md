@@ -57,7 +57,7 @@ poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 
 ## Quickstart
 
-A 1-species birth-death process, `∅ → X` at rate λ and `X → ∅` at rate μ·x, simulated for 10 independent replicates and plotted:
+A 1-species birth-death process, `∅ → X` at rate λ and `X → ∅` at rate μ·x, simulated for 100 independent replicates:
 
 ```python
 from typing import NamedTuple
