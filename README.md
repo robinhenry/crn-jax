@@ -130,4 +130,5 @@ from crn_jax.kinetics import hill_function, sample_lognormal
 ## See Also
 
 * [GillesPy2](https://github.com/StochSS/GillesPy2): C++ optimized Gillespie simulations on CPU.
+* [jax-smfsb](https://github.com/darrenjw/jax-smfsb): JAX implementations of algorithms from the Stochastic Modelling for Systems Biology book.
 * [myriad-jax](https://github.com/robinhenry/myriad-jax): RL-style decision making fully in JAX, powered by `grn-jax` at its core.
