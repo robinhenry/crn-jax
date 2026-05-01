@@ -10,13 +10,7 @@ Reactions
 
 The stationary distribution at constant ``u`` is Poisson with mean
 ``⟨X⟩(u) = (β/γ) · uⁿ / (Kⁿ + uⁿ)`` — Fano factor 1.
-
-Defaults match the canonical "inducible" benchmark used across the
-neural-crn experiment series (β = 30 molec/min, K = 6 ng/mL, n = 2,
-γ = 0.023 /min for stable GFP).
 """
-
-from __future__ import annotations
 
 import dataclasses
 from typing import Callable, NamedTuple
@@ -48,10 +42,10 @@ class Params:
     steady state but same Hill shape).
     """
 
-    beta: float = 30.0
-    K: float = 6.0
-    n: float = 2.0
-    gamma: float = 0.023
+    beta: float = 30.0  # molec / min
+    K: float = 6.0  # ng / mL  (same units as input u)
+    n: float = 2.0  # Hill coefficient (dimensionless)
+    gamma: float = 0.023  # 1 / min
 
 
 # --- Propensities + reactions -----------------------------------------------

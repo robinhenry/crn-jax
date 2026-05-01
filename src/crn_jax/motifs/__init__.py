@@ -38,8 +38,6 @@ helper isn't enough (e.g. custom u schedule, non-uniform x0)::
     )
 """
 
-from __future__ import annotations
-
 from . import autoreg, cascade, ffl_and, inducible
 
 __all__ = ["autoreg", "cascade", "ffl_and", "inducible"]

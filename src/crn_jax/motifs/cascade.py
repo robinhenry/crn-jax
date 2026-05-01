@@ -19,8 +19,6 @@ on a sub-minute timescale, so coarser dt biases the moment-matching
 estimate of a_3.
 """
 
-from __future__ import annotations
-
 import dataclasses
 from typing import Callable, NamedTuple
 
@@ -47,15 +45,15 @@ class Params:
     """Hooshangi 2005 / Cox 2007 cascade defaults."""
 
     # Stage 1 — u → X
-    beta_X: float = 40.0
-    K_u: float = 6.0
-    n_u: float = 2.0
-    gamma_X: float = 0.023
+    beta_X: float = 40.0  # molec / min
+    K_u: float = 6.0  # ng / mL  (same units as input u)
+    n_u: float = 2.0  # Hill coefficient (dimensionless)
+    gamma_X: float = 0.023  # 1 / min
     # Stage 2 — X → Y (Y is repressed by X)
-    beta_Y: float = 30.0
-    K_X: float = 60.0
-    n_X: float = 2.7
-    gamma_Y: float = 0.023
+    beta_Y: float = 30.0  # molec / min
+    K_X: float = 60.0  # molecules  (same units as state X)
+    n_X: float = 2.7  # Hill coefficient (dimensionless)
+    gamma_Y: float = 0.023  # 1 / min
 
 
 # --- Propensities + reactions -----------------------------------------------

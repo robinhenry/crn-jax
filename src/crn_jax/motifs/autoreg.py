@@ -9,15 +9,12 @@ Reactions
     R1:  X → ∅     at rate  γ · X                      (linear degradation)
 
 The deterministic equilibrium is the root of ``β / (1 + (X/K)ⁿ) = γ X``;
-for the default parameters (β=40, K=40, n=1.4, γ=0.023) it sits around
-X ≈ 150–185.
+for the defaults it sits around X ≈ 150–185.
 
 The non-integer Hill exponent (n=1.4) is intentional — it's the test
 case for symbolic regression's ability to recover non-canonical
 exponents.
 """
-
-from __future__ import annotations
 
 import dataclasses
 from typing import Callable, NamedTuple
@@ -40,10 +37,10 @@ from ._common import (
 
 @dataclasses.dataclass(frozen=True)
 class Params:
-    beta: float = 40.0
-    K: float = 40.0
-    n: float = 1.4
-    gamma: float = 0.023
+    beta: float = 40.0  # molec / min
+    K: float = 40.0  # molecules  (same units as state X)
+    n: float = 1.4  # Hill coefficient (dimensionless; non-integer on purpose)
+    gamma: float = 0.023  # 1 / min
 
 
 # --- Propensities + reactions -----------------------------------------------

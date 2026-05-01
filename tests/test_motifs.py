@@ -12,8 +12,6 @@ For each motif we check three things:
    correctness, not statistical power.
 """
 
-from __future__ import annotations
-
 import jax
 import jax.numpy as jnp
 import numpy as np

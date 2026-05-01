@@ -22,8 +22,6 @@ dt = 0.1 is the recommended sampling interval — same reasoning as the
 cascade motif (R2 and R4 are state-dependent and need fine sampling).
 """
 
-from __future__ import annotations
-
 import dataclasses
 from typing import Callable, NamedTuple
 
@@ -50,22 +48,22 @@ class Params:
     """Alon textbook 2nd ed., Ch. 4 / Kaplan 2008 / Mangan-Alon 2003 defaults."""
 
     # Stage 1 — u → X
-    beta_X: float = 40.0
-    K_u: float = 6.0
-    n_u: float = 2.0
-    gamma_X: float = 0.023
+    beta_X: float = 40.0  # molec / min
+    K_u: float = 6.0  # ng / mL  (same units as input u)
+    n_u: float = 2.0  # Hill coefficient (dimensionless)
+    gamma_X: float = 0.023  # 1 / min
     # Stage 2 — X → Y (Y activated by X)
-    beta_Y: float = 50.0
-    K_xy: float = 100.0
-    n_xy: float = 2.0
-    gamma_Y: float = 0.023
+    beta_Y: float = 50.0  # molec / min
+    K_xy: float = 100.0  # molecules  (same units as state X)
+    n_xy: float = 2.0  # Hill coefficient (dimensionless)
+    gamma_Y: float = 0.023  # 1 / min
     # Output — (X, Y) → Z (multiplicative AND gate)
-    beta_Z: float = 60.0
-    K_xz: float = 100.0
-    n_xz: float = 2.0
-    K_yz: float = 80.0
-    n_yz: float = 2.0
-    gamma_Z: float = 0.023
+    beta_Z: float = 60.0  # molec / min
+    K_xz: float = 100.0  # molecules  (same units as state X)
+    n_xz: float = 2.0  # Hill coefficient (dimensionless)
+    K_yz: float = 80.0  # molecules  (same units as state Y)
+    n_yz: float = 2.0  # Hill coefficient (dimensionless)
+    gamma_Z: float = 0.023  # 1 / min
 
 
 # --- Propensities + reactions -----------------------------------------------
