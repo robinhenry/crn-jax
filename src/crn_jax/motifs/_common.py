@@ -84,13 +84,11 @@ def make_vmap_simulator(
         ``u_batch`` (per-replicate scalar input, held constant across the
         trajectory). For input-free motifs pass ``jnp.zeros((n_replicates,))``.
 
-        The constant-u-per-trajectory inputs array ``jnp.full((n_steps,), u)``
-        is materialised *inside* the vmapped per-replicate function. That
-        matches the per-replicate full-array pattern users typically write by
-        hand. Pre-broadcasting outside the vmap (via ``jnp.broadcast_to``)
-        traces to a different XLA program whose floating-point reduction
-        order differs in a tiny fraction of replicates, causing some
-        trajectories to diverge — so we keep the materialisation per-replicate.
+        The inputs array is materialised inside the vmapped per-replicate
+        function rather than pre-broadcast as ``(n_replicates, n_steps)``
+        outside. Both are mathematically equivalent; this form matches the
+        per-replicate idiom users typically write when calling
+        ``simulate_trajectory`` directly.
     """
 
     def simulate_one(key, x0, dt, u_scalar):
@@ -134,10 +132,9 @@ def sample_initial_state(
     * ``("uniform", lo, hi)``: continuous uniform over ``[lo, hi)``.
     * ``("zero",)``: constant zero.
 
-    Mixture / stratified samplers are intentionally out of scope for the
-    v0.2 motif library — they're experimental-design knobs, not motif
-    specifications. Callers needing them should sample ``x0`` themselves
-    and skip ``simulate_dataset`` in favour of the BYO path.
+    Mixture / stratified samplers are intentionally out of scope for now.
+    Callers needing them should sample ``x0`` themselves and skip ``simulate_dataset``
+    in favour of the BYO path.
     """
     kind = dist[0]
     if kind == "uniform":

@@ -17,9 +17,6 @@ when *both* X and Y are above their respective half-max thresholds.
 
 Defaults from Alon's textbook (2nd ed., Ch. 4) / Kaplan et al. 2008.
 Steady states at saturating u: X_ss ≈ 1740, Y_ss ≈ 2167, Z_ss ≈ 2606.
-
-dt = 0.1 is the recommended sampling interval — same reasoning as the
-cascade motif (R2 and R4 are state-dependent and need fine sampling).
 """
 
 import dataclasses

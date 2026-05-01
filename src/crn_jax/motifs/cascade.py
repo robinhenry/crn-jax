@@ -12,10 +12,6 @@ Reactions
 
 The cascade *inverts* the input: at u → ∞, X is high (~1740) and Y is
 suppressed (~0); at u = 0, X = 0 and Y is high (~1300).
-
-``dt = 0.1`` is the recommended sampling interval: the production rate
-of Y depends on X, which itself changes on a sub-minute timescale, so
-coarser ``dt`` biases moment-matching estimates of the X→Y propensity.
 """
 
 import dataclasses
