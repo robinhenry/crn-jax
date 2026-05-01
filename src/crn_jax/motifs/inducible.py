@@ -13,6 +13,7 @@ The stationary distribution at constant ``u`` is Poisson with mean
 """
 
 import dataclasses
+import functools
 from typing import Callable, NamedTuple
 
 import jax
@@ -68,6 +69,17 @@ def apply_reaction(state: State, j: Array) -> State:
     return state._replace(x=jnp.maximum(0.0, state.x + dx))
 
 
+@functools.lru_cache(maxsize=None)
+def _build_simulator(n_steps: int, params: Params):
+    """Cache the JIT'd batch simulator per (n_steps, params).
+
+    ``make_vmap_simulator`` returns a freshly-JIT'd function on every call,
+    so without this cache repeated ``simulate_dataset`` invocations re-trace
+    and re-compile (``Params`` is a frozen dataclass and therefore hashable).
+    """
+    return make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
+
+
 # --- One-call dataset --------------------------------------------------------
 
 
@@ -108,7 +120,7 @@ def simulate_dataset(
     u_arr = sample_initial_state(k_u, (n_replicates,), u_dist)
     keys = jax.random.split(k_sim, n_replicates)
 
-    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
+    run = _build_simulator(n_steps, params)
     states = run(keys, x0, dt, u_arr)
 
     times = jnp.arange(1, n_steps + 1) * dt

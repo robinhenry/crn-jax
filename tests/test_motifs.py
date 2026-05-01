@@ -242,14 +242,23 @@ def test_byo_path_compatible_with_simulate_trajectory():
 # --- JIT cache hit -----------------------------------------------------------
 
 
-def test_simulate_dataset_jit_caches_across_calls():
-    """Calling simulate_dataset twice with same n_steps shouldn't retrace."""
-    key = jax.random.PRNGKey(0)
-    # First call compiles.
-    ds1 = inducible.simulate_dataset(key, n_replicates=8, n_steps=200)
-    # Second call with same n_replicates/n_steps and a different key should be fast
-    # — same JIT cache. We don't assert a wall-clock bound (flaky under load),
-    # but the shape match is enough to confirm the call succeeded under
-    # whatever compilation cache exists.
+def test_simulate_dataset_reuses_compiled_simulator():
+    """Two calls with the same (n_steps, params) must reuse the same compiled
+    ``run`` function. Without this the inner ``make_vmap_simulator`` builds a
+    fresh ``@jax.jit`` closure every call, which JAX's cache keys on function
+    identity — i.e. recompiles each time and burns ~seconds of overhead.
+    """
+    p = inducible.Params()
+    run1 = inducible._build_simulator(200, p)
+    run2 = inducible._build_simulator(200, p)
+    assert run1 is run2, "expected the same compiled simulator object"
+    # Different n_steps should be a separate cache entry.
+    run3 = inducible._build_simulator(400, p)
+    assert run3 is not run1
+    # Different params (frozen dataclass equality) should also be separate.
+    run4 = inducible._build_simulator(200, inducible.Params(beta=42.0))
+    assert run4 is not run1
+    # And both should still produce well-shaped datasets.
+    ds1 = inducible.simulate_dataset(jax.random.PRNGKey(0), n_replicates=8, n_steps=200)
     ds2 = inducible.simulate_dataset(jax.random.PRNGKey(1), n_replicates=8, n_steps=200)
-    assert ds1.Xs.shape == ds2.Xs.shape
+    assert ds1.Xs.shape == ds2.Xs.shape == (8, 200)

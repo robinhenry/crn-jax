@@ -15,6 +15,7 @@ suppressed (~0); at u = 0, X = 0 and Y is high (~1300).
 """
 
 import dataclasses
+import functools
 from typing import Callable, NamedTuple
 
 import jax
@@ -75,6 +76,14 @@ def apply_reaction(state: State, j: Array) -> State:
     return state._replace(x=new_x)
 
 
+@functools.lru_cache(maxsize=None)
+def _build_simulator(n_steps: int, params: Params):
+    """Cache the JIT'd batch simulator per (n_steps, params) — see
+    :func:`crn_jax.motifs.inducible._build_simulator` for the rationale.
+    """
+    return make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
+
+
 # --- One-call dataset --------------------------------------------------------
 
 
@@ -119,7 +128,7 @@ def simulate_dataset(
     # Stack into (n_replicates, 2) — the per-replicate State.x shape.
     x0_state = jnp.stack([x0, y0], axis=-1)
 
-    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
+    run = _build_simulator(n_steps, params)
     states = run(keys, x0_state, dt, u_arr)
 
     # states.x shape (n_replicates, n_steps, 2) — split into per-species trajectories.

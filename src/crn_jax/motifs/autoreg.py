@@ -17,6 +17,7 @@ exponents.
 """
 
 import dataclasses
+import functools
 from typing import Callable, NamedTuple
 
 import jax
@@ -73,6 +74,14 @@ def apply_reaction(state: State, j: Array) -> State:
     return state._replace(x=jnp.maximum(0.0, state.x + dx))
 
 
+@functools.lru_cache(maxsize=None)
+def _build_simulator(n_steps: int, params: Params):
+    """Cache the JIT'd batch simulator per (n_steps, params) — see
+    :func:`crn_jax.motifs.inducible._build_simulator` for the rationale.
+    """
+    return make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
+
+
 # --- One-call dataset --------------------------------------------------------
 
 
@@ -104,7 +113,7 @@ def simulate_dataset(
     x0 = sample_initial_state(k_x0, (n_replicates,), x0_dist)
     keys = jax.random.split(k_sim, n_replicates)
 
-    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
+    run = _build_simulator(n_steps, params)
     # No exogenous input — pass zero per replicate. simulate_trajectory will
     # still thread the (constant) input through, but it's ignored by the
     # propensity.
