@@ -52,6 +52,7 @@ poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 - 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
 - ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
 - 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
+- 🎨 **Pre-built motifs** - a series of standard motifs implemented for convenience.
 - 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
 
@@ -106,22 +107,19 @@ See the [examples](examples/) folder for more detailed examples.
 
 ## Standard motifs
 
-`crn_jax.motifs` ships pre-built canonical reaction networks for benchmarking
-system identification. Each motif exports a uniform surface — `State`, `Params`,
-`propensities_fn`, `apply_reaction`, plus a one-call `simulate_dataset` —
-so swapping systems is a one-line change:
+`crn_jax.motifs` provides pre-built canonical reaction networks. Each motif exports a uniform surface: `State`, `Params`, `propensities_fn()`, `apply_reaction()`, plus a one-call `simulate_dataset()`, so generating time series from different systems is a one-line change:
 
 ```python
 import jax
 from crn_jax.motifs import cascade
 
 ds = cascade.simulate_dataset(jax.random.PRNGKey(0))
-ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY  # ready for moment matching
+
+# Access X, Y, u, dX, dY observations
+ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY
 ```
 
-The bare primitives also plug into `simulate_trajectory` directly when the
-convenience helper isn't enough (custom `u` schedules, mixture initial
-conditions, etc.).
+The primitive functions (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper `simulate_dataset` isn't enough (e.g., if you need custom `u` schedules, specific initial condition mixtures, etc.).
 
 | motif        | reactions | input | shape                                      |
 | ------------ | --------- | ----- | ------------------------------------------ |

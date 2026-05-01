@@ -13,10 +13,9 @@ Reactions
 The cascade *inverts* the input: at u → ∞, X is high (~1740) and Y is
 suppressed (~0); at u = 0, X = 0 and Y is high (~1300).
 
-dt = 0.1 is the recommended sampling interval (per the exp 11F + 15
-finding): the production rate of Y depends on X, which itself changes
-on a sub-minute timescale, so coarser dt biases the moment-matching
-estimate of a_3.
+``dt = 0.1`` is the recommended sampling interval: the production rate
+of Y depends on X, which itself changes on a sub-minute timescale, so
+coarser ``dt`` biases moment-matching estimates of the X→Y propensity.
 """
 
 import dataclasses
@@ -84,50 +83,50 @@ def apply_reaction(state: State, j: Array) -> State:
 
 
 class Dataset(NamedTuple):
-    times: np.ndarray
-    x0: np.ndarray
-    y0: np.ndarray
-    u: np.ndarray
-    Xs: np.ndarray  # (n_envs, n_steps)
-    Ys: np.ndarray  # (n_envs, n_steps)
-    X_t: np.ndarray  # flat triples
-    Y_t: np.ndarray
-    dX: np.ndarray
-    dY: np.ndarray
-    u_per_triple: np.ndarray
+    times: np.ndarray  # (n_steps,) — sample times (in `dt` units)
+    x0: np.ndarray  # (n_replicates,) — sampled initial X
+    y0: np.ndarray  # (n_replicates,) — sampled initial Y
+    u: np.ndarray  # (n_replicates,) — per-trajectory constant input
+    Xs: np.ndarray  # (n_replicates, n_steps) — full X trajectories
+    Ys: np.ndarray  # (n_replicates, n_steps) — full Y trajectories
+    X_t: np.ndarray  # (n_replicates * n_steps,) — flat X[k] for each (replicate, step)
+    Y_t: np.ndarray  # (n_replicates * n_steps,) — flat Y[k] for each (replicate, step)
+    dX: np.ndarray  # (n_replicates * n_steps,) — flat ΔX = X[k+1] − X[k]
+    dY: np.ndarray  # (n_replicates * n_steps,) — flat ΔY = Y[k+1] − Y[k]
+    u_per_triple: np.ndarray  # (n_replicates * n_steps,) — u broadcast to triple level
 
 
 def simulate_dataset(
     key: PRNGKey,
     *,
     params: Params = Params(),
-    n_envs: int = 1800,
+    n_replicates: int = 1800,
     n_steps: int = 1000,
     dt: float = 0.1,
     x0_dist: tuple = ("uniform", 0.0, 1800.0),
     y0_dist: tuple = ("uniform", 0.0, 1400.0),
     u_dist: tuple = ("uniform", 0.0, 35.0),
 ) -> Dataset:
-    """Simulate ``n_envs`` independent cascade trajectories.
+    """Simulate ``n_replicates`` independent cascade trajectories.
 
     Each trajectory draws its own (X(0), Y(0), u). Default ``n_steps=1000``
     × ``dt=0.1`` gives 100-min trajectories — about one cascade response
-    time. For Y-only / late-time work (e.g. exp 16) bump ``n_steps`` so
-    the cascade has equilibrated.
+    time. For partial-observability or late-time work, bump ``n_steps``
+    so the cascade has equilibrated under each input.
     """
     k_x0, k_y0, k_u, k_sim = jax.random.split(key, 4)
-    x0 = sample_initial_state(k_x0, (n_envs,), x0_dist)
-    y0 = sample_initial_state(k_y0, (n_envs,), y0_dist)
-    u_arr = sample_initial_state(k_u, (n_envs,), u_dist)
-    keys = jax.random.split(k_sim, n_envs)
+    x0 = sample_initial_state(k_x0, (n_replicates,), x0_dist)
+    y0 = sample_initial_state(k_y0, (n_replicates,), y0_dist)
+    u_arr = sample_initial_state(k_u, (n_replicates,), u_dist)
+    keys = jax.random.split(k_sim, n_replicates)
 
-    # Stack into (n_envs, 2) — the per-replicate State.x shape.
+    # Stack into (n_replicates, 2) — the per-replicate State.x shape.
     x0_state = jnp.stack([x0, y0], axis=-1)
 
-    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction, State)
+    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
     states = run(keys, x0_state, dt, u_arr)
 
-    # states.x shape (n_envs, n_steps, 2) — split into per-species trajectories.
+    # states.x shape (n_replicates, n_steps, 2) — split into per-species trajectories.
     xs_full = np.asarray(states.x)
     Xs = xs_full[:, :, 0]
     Ys = xs_full[:, :, 1]

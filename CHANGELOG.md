@@ -3,11 +3,7 @@
 ## v0.2.0
 
 - New `crn_jax.motifs` subpackage: pre-built canonical GRN motifs
-  (`inducible`, `autoreg`, `cascade`, `ffl_and`). Each module exports a
-  uniform surface (`State`, `Params`, `propensities_fn`, `apply_reaction`,
-  `simulate_dataset`) so swapping systems in benchmarks is a one-line
-  change. The bare propensity / reaction primitives also drop into
-  `simulate_trajectory` directly.
+  (`inducible`, `autoreg`, `cascade`, `ffl_and`). Each module exports a uniform surface (`State`, `Params`, `propensities_fn`, `apply_reaction`, `simulate_dataset`) so swapping systems in benchmarks is a one-line change. The bare propensity / reaction primitives also drop into `simulate_trajectory` directly.
 - New example `examples/03_grn_motifs.py`.
 - 14 new motif tests in `tests/test_motifs.py`.
 

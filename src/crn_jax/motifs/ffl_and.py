@@ -99,28 +99,28 @@ def apply_reaction(state: State, j: Array) -> State:
 
 
 class Dataset(NamedTuple):
-    times: np.ndarray
-    x0: np.ndarray
-    y0: np.ndarray
-    z0: np.ndarray
-    u: np.ndarray
-    Xs: np.ndarray
-    Ys: np.ndarray
-    Zs: np.ndarray
-    X_t: np.ndarray
-    Y_t: np.ndarray
-    Z_t: np.ndarray
-    dX: np.ndarray
-    dY: np.ndarray
-    dZ: np.ndarray
-    u_per_triple: np.ndarray
+    times: np.ndarray  # (n_steps,) — sample times (in `dt` units)
+    x0: np.ndarray  # (n_replicates,) — sampled initial X
+    y0: np.ndarray  # (n_replicates,) — sampled initial Y
+    z0: np.ndarray  # (n_replicates,) — sampled initial Z
+    u: np.ndarray  # (n_replicates,) — per-trajectory constant input
+    Xs: np.ndarray  # (n_replicates, n_steps) — full X trajectories
+    Ys: np.ndarray  # (n_replicates, n_steps) — full Y trajectories
+    Zs: np.ndarray  # (n_replicates, n_steps) — full Z trajectories
+    X_t: np.ndarray  # (n_replicates * n_steps,) — flat X[k] for each (replicate, step)
+    Y_t: np.ndarray  # (n_replicates * n_steps,) — flat Y[k] for each (replicate, step)
+    Z_t: np.ndarray  # (n_replicates * n_steps,) — flat Z[k] for each (replicate, step)
+    dX: np.ndarray  # (n_replicates * n_steps,) — flat ΔX = X[k+1] − X[k]
+    dY: np.ndarray  # (n_replicates * n_steps,) — flat ΔY = Y[k+1] − Y[k]
+    dZ: np.ndarray  # (n_replicates * n_steps,) — flat ΔZ = Z[k+1] − Z[k]
+    u_per_triple: np.ndarray  # (n_replicates * n_steps,) — u broadcast to triple level
 
 
 def simulate_dataset(
     key: PRNGKey,
     *,
     params: Params = Params(),
-    n_envs: int = 1500,
+    n_replicates: int = 1500,
     n_steps: int = 2000,
     dt: float = 0.1,
     x0_dist: tuple = ("uniform", 0.0, 1800.0),
@@ -128,24 +128,24 @@ def simulate_dataset(
     z0_dist: tuple = ("uniform", 0.0, 2700.0),
     u_dist: tuple = ("uniform", 0.0, 35.0),
 ) -> Dataset:
-    """Simulate ``n_envs`` independent FFL trajectories with AND-gate output.
+    """Simulate ``n_replicates`` independent FFL trajectories with AND-gate output.
 
     Default ``n_steps=2000`` × ``dt=0.1`` = 200 min/traj ≈ 4.6 cascade
     response times — long enough to populate the (X, Y) joint distribution
     but biased toward the saturating regime. For exponent identifiability
-    (n_xz, n_yz) consider step responses or wider u sampling — see the
-    ``experiments/19_ffl_and_gate`` README.
+    (n_xz, n_yz) consider step responses or wider ``u`` sampling — the
+    steady-state-dominated regime confounds them.
     """
     k_x0, k_y0, k_z0, k_u, k_sim = jax.random.split(key, 5)
-    x0 = sample_initial_state(k_x0, (n_envs,), x0_dist)
-    y0 = sample_initial_state(k_y0, (n_envs,), y0_dist)
-    z0 = sample_initial_state(k_z0, (n_envs,), z0_dist)
-    u_arr = sample_initial_state(k_u, (n_envs,), u_dist)
-    keys = jax.random.split(k_sim, n_envs)
+    x0 = sample_initial_state(k_x0, (n_replicates,), x0_dist)
+    y0 = sample_initial_state(k_y0, (n_replicates,), y0_dist)
+    z0 = sample_initial_state(k_z0, (n_replicates,), z0_dist)
+    u_arr = sample_initial_state(k_u, (n_replicates,), u_dist)
+    keys = jax.random.split(k_sim, n_replicates)
 
     x0_state = jnp.stack([x0, y0, z0], axis=-1)
 
-    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction, State)
+    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
     states = run(keys, x0_state, dt, u_arr)
 
     xs_full = np.asarray(states.x)

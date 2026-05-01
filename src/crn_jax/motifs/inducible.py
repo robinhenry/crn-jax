@@ -78,37 +78,37 @@ class Dataset(NamedTuple):
     not further JAX work.
     """
 
-    times: np.ndarray  # (n_steps,) — sample times in minutes
-    x0: np.ndarray  # (n_envs,) — sampled initial X
-    u: np.ndarray  # (n_envs,) — per-trajectory constant input
-    Xs: np.ndarray  # (n_envs, n_steps) — full trajectories
-    X_t: np.ndarray  # (n_envs * n_steps,) — flat triples
-    dX: np.ndarray  # (n_envs * n_steps,)
-    u_per_triple: np.ndarray  # (n_envs * n_steps,) — u broadcast to triple level
+    times: np.ndarray  # (n_steps,) — sample times (in `dt` units)
+    x0: np.ndarray  # (n_replicates,) — sampled initial X
+    u: np.ndarray  # (n_replicates,) — per-trajectory constant input
+    Xs: np.ndarray  # (n_replicates, n_steps) — full X trajectories
+    X_t: np.ndarray  # (n_replicates * n_steps,) — flat X[k] for each (replicate, step)
+    dX: np.ndarray  # (n_replicates * n_steps,) — flat ΔX = X[k+1] − X[k]
+    u_per_triple: np.ndarray  # (n_replicates * n_steps,) — u broadcast to triple level
 
 
 def simulate_dataset(
     key: PRNGKey,
     *,
     params: Params = Params(),
-    n_envs: int = 1800,
+    n_replicates: int = 1800,
     n_steps: int = 1440,
     dt: float = 1.0,
     x0_dist: tuple = ("uniform", 0.0, 1500.0),
     u_dist: tuple = ("uniform", 0.0, 35.0),
 ) -> Dataset:
-    """Simulate ``n_envs`` independent inducible-motif trajectories.
+    """Simulate ``n_replicates`` independent inducible-motif trajectories.
 
     Each trajectory draws its own initial X and its own constant u. Returns
     both the raw trajectories and the flat ``(X_t, dX, u_per_triple)``
     one-step transitions used by moment-matching pipelines.
     """
     k_x0, k_u, k_sim = jax.random.split(key, 3)
-    x0 = sample_initial_state(k_x0, (n_envs,), x0_dist)
-    u_arr = sample_initial_state(k_u, (n_envs,), u_dist)
-    keys = jax.random.split(k_sim, n_envs)
+    x0 = sample_initial_state(k_x0, (n_replicates,), x0_dist)
+    u_arr = sample_initial_state(k_u, (n_replicates,), u_dist)
+    keys = jax.random.split(k_sim, n_replicates)
 
-    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction, State)
+    run = make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
     states = run(keys, x0, dt, u_arr)
 
     times = jnp.arange(1, n_steps + 1) * dt

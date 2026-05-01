@@ -39,5 +39,6 @@ helper isn't enough (e.g. custom u schedule, non-uniform x0)::
 """
 
 from . import autoreg, cascade, ffl_and, inducible
+from ._common import State
 
-__all__ = ["autoreg", "cascade", "ffl_and", "inducible"]
+__all__ = ["State", "autoreg", "cascade", "ffl_and", "inducible"]

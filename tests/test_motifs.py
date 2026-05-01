@@ -4,11 +4,11 @@ For each motif we check three things:
 
 1. **Propensity sanity**: ``propensities_fn(Params())(state, u)`` returns a
    finite, non-negative array of the expected length.
-2. **simulate_dataset shapes**: a tiny call (n_envs=8, n_steps=200) returns
+2. **simulate_dataset shapes**: a tiny call (n_replicates=8, n_steps=200) returns
    the documented arrays with the right dtypes and sizes.
 3. **Steady-state agreement**: the mean of the late-time trajectories
    matches the analytic ⟨x⟩ within a coarse tolerance. We use a relaxed
-   3σ-ish bound because n_envs is tiny — these tests are about
+   3σ-ish bound because n_replicates is tiny — these tests are about
    correctness, not statistical power.
 """
 
@@ -31,7 +31,7 @@ def test_inducible_propensities_finite():
 
 
 def test_inducible_dataset_shapes():
-    ds = inducible.simulate_dataset(jax.random.PRNGKey(0), n_envs=8, n_steps=200)
+    ds = inducible.simulate_dataset(jax.random.PRNGKey(0), n_replicates=8, n_steps=200)
     assert ds.Xs.shape == (8, 200)
     assert ds.X_t.shape == (8 * 200,)
     assert ds.dX.shape == (8 * 200,)
@@ -49,7 +49,7 @@ def test_inducible_steady_state_at_saturation():
     ds = inducible.simulate_dataset(
         jax.random.PRNGKey(0),
         params=p,
-        n_envs=64,
+        n_replicates=64,
         n_steps=1440,
         dt=1.0,
         u_dist=("uniform", 30.0, 35.0),  # saturating regime
@@ -57,7 +57,7 @@ def test_inducible_steady_state_at_saturation():
     analytic = p.beta / p.gamma  # ≈ 1304 at full saturation
     second_half = ds.Xs[:, ds.Xs.shape[1] // 2 :]
     mean = float(second_half.mean())
-    # Allow a generous ±10% for finite-n_envs noise; this is a sanity check.
+    # Allow a generous ±10% for finite-n_replicates noise; this is a sanity check.
     assert abs(mean - analytic) / analytic < 0.10, f"mean={mean}, analytic={analytic}"
 
 
@@ -74,7 +74,7 @@ def test_autoreg_propensities_finite():
 
 
 def test_autoreg_dataset_shapes_and_no_input():
-    ds = autoreg.simulate_dataset(jax.random.PRNGKey(0), n_envs=8, n_steps=200)
+    ds = autoreg.simulate_dataset(jax.random.PRNGKey(0), n_replicates=8, n_steps=200)
     assert ds.Xs.shape == (8, 200)
     assert ds.X_t.shape == (8 * 200,)
     assert ds.dX.shape == (8 * 200,)
@@ -100,7 +100,7 @@ def test_autoreg_steady_state():
             hi = mid
     analytic = 0.5 * (lo + hi)
 
-    ds = autoreg.simulate_dataset(jax.random.PRNGKey(0), n_envs=64, n_steps=1440, dt=1.0)
+    ds = autoreg.simulate_dataset(jax.random.PRNGKey(0), n_replicates=64, n_steps=1440, dt=1.0)
     mean = float(ds.Xs[:, ds.Xs.shape[1] // 2 :].mean())
     assert abs(mean - analytic) / analytic < 0.10, f"mean={mean}, analytic={analytic}"
 
@@ -118,7 +118,7 @@ def test_cascade_propensities_finite():
 
 
 def test_cascade_dataset_shapes():
-    ds = cascade.simulate_dataset(jax.random.PRNGKey(0), n_envs=8, n_steps=200, dt=0.1)
+    ds = cascade.simulate_dataset(jax.random.PRNGKey(0), n_replicates=8, n_steps=200, dt=0.1)
     assert ds.Xs.shape == (8, 200)
     assert ds.Ys.shape == (8, 200)
     assert ds.X_t.shape == (8 * 200,)
@@ -134,7 +134,7 @@ def test_cascade_inverts_input():
     ds_low = cascade.simulate_dataset(
         jax.random.PRNGKey(0),
         params=p,
-        n_envs=32,
+        n_replicates=32,
         n_steps=4000,
         dt=0.1,
         u_dist=("uniform", 0.0, 0.5),
@@ -142,7 +142,7 @@ def test_cascade_inverts_input():
     ds_high = cascade.simulate_dataset(
         jax.random.PRNGKey(1),
         params=p,
-        n_envs=32,
+        n_replicates=32,
         n_steps=4000,
         dt=0.1,
         u_dist=("uniform", 30.0, 35.0),
@@ -174,7 +174,7 @@ def test_ffl_propensities_finite():
 
 
 def test_ffl_dataset_shapes():
-    ds = ffl_and.simulate_dataset(jax.random.PRNGKey(0), n_envs=8, n_steps=200, dt=0.1)
+    ds = ffl_and.simulate_dataset(jax.random.PRNGKey(0), n_replicates=8, n_steps=200, dt=0.1)
     assert ds.Xs.shape == (8, 200)
     assert ds.Ys.shape == (8, 200)
     assert ds.Zs.shape == (8, 200)
@@ -195,7 +195,7 @@ def test_ffl_and_gate_off_at_zero_input():
     ds = ffl_and.simulate_dataset(
         jax.random.PRNGKey(0),
         params=p,
-        n_envs=16,
+        n_replicates=16,
         n_steps=4000,
         dt=0.1,
         u_dist=("uniform", 0.0, 0.5),
@@ -246,10 +246,10 @@ def test_simulate_dataset_jit_caches_across_calls():
     """Calling simulate_dataset twice with same n_steps shouldn't retrace."""
     key = jax.random.PRNGKey(0)
     # First call compiles.
-    ds1 = inducible.simulate_dataset(key, n_envs=8, n_steps=200)
-    # Second call with same n_envs/n_steps and a different key should be fast
+    ds1 = inducible.simulate_dataset(key, n_replicates=8, n_steps=200)
+    # Second call with same n_replicates/n_steps and a different key should be fast
     # — same JIT cache. We don't assert a wall-clock bound (flaky under load),
     # but the shape match is enough to confirm the call succeeded under
     # whatever compilation cache exists.
-    ds2 = inducible.simulate_dataset(jax.random.PRNGKey(1), n_envs=8, n_steps=200)
+    ds2 = inducible.simulate_dataset(jax.random.PRNGKey(1), n_replicates=8, n_steps=200)
     assert ds1.Xs.shape == ds2.Xs.shape

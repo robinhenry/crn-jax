@@ -9,7 +9,7 @@ ingredients out so each motif file only owns its propensity function,
 glue that picks initial conditions and inputs.
 """
 
-from typing import Any, Callable, NamedTuple
+from typing import Callable, NamedTuple, Protocol
 
 import jax
 import jax.numpy as jnp
@@ -43,45 +43,58 @@ class State(NamedTuple):
 # --- vmap-jit simulator factory ---------------------------------------------
 
 
+class BatchSimulator(Protocol):
+    """The function returned by :func:`make_vmap_simulator`.
+
+    Given per-replicate keys, initial ``state.x`` values, a shared timestep,
+    and per-replicate scalar inputs, returns a stacked :class:`State`
+    PyTree with a leading replicate axis.
+    """
+
+    def __call__(
+        self,
+        keys: jax.Array,
+        x0_batch: jax.Array,
+        dt: float | jax.Array,
+        u_batch: jax.Array,
+    ) -> State: ...
+
+
 def make_vmap_simulator(
     n_steps: int,
-    propensities_fn: Callable[[Any, jax.Array], jax.Array],
-    apply_reaction_fn: Callable[[Any, jax.Array], Any],
-    state_cls: type,
-) -> Callable[..., Any]:
+    propensities_fn: Callable[[State, jax.Array], jax.Array],
+    apply_reaction_fn: Callable[[State, jax.Array], State],
+) -> BatchSimulator:
     """Build a JIT'd vmap'd batch simulator for a fixed motif and ``n_steps``.
 
     ``simulate_trajectory`` requires ``n_steps`` to be a Python int (it sets
     ``jax.lax.scan``'s trip count). Wrapping it in a closure makes
     ``n_steps`` a compile-time constant while still letting the caller vary
-    it across calls — the standard pattern used across neural-crn
-    experiments 13 / 15 / 19.
+    it across calls.
 
     Args:
         n_steps: Number of intervals each trajectory runs for.
         propensities_fn: Closure ``(state, u) -> Array[M]`` already bound to
             its motif parameters (see e.g. :func:`inducible.propensities_fn`).
         apply_reaction_fn: ``(state, reaction_idx) -> state`` for the motif.
-        state_cls: The motif's ``State`` NamedTuple class.
 
     Returns:
-        A function ``run(keys, x0_batch, dt, u_batch)`` that vmaps the
-        per-trajectory simulation over ``keys``, ``x0_batch`` (per-replicate
-        initial state.x), and ``u_batch`` (per-replicate scalar input,
-        held constant across the trajectory). For input-free motifs pass
-        ``jnp.zeros((n_envs,))``.
+        A :class:`BatchSimulator` that vmaps the per-trajectory simulation
+        over ``keys``, ``x0_batch`` (per-replicate initial ``state.x``), and
+        ``u_batch`` (per-replicate scalar input, held constant across the
+        trajectory). For input-free motifs pass ``jnp.zeros((n_replicates,))``.
 
         The constant-u-per-trajectory inputs array ``jnp.full((n_steps,), u)``
-        is materialized *inside* the vmapped per-replicate function — that's
-        the pattern legacy ``generate_data.py`` files use, and it produces
-        bit-identical Gillespie trajectories. Pre-broadcasting outside the
-        vmap (via ``jnp.broadcast_to``) traces to a different XLA program
-        whose floating-point reduction order differs in a tiny fraction of
-        replicates, causing some trajectories to diverge.
+        is materialised *inside* the vmapped per-replicate function. That
+        matches the per-replicate full-array pattern users typically write by
+        hand. Pre-broadcasting outside the vmap (via ``jnp.broadcast_to``)
+        traces to a different XLA program whose floating-point reduction
+        order differs in a tiny fraction of replicates, causing some
+        trajectories to diverge — so we keep the materialisation per-replicate.
     """
 
     def simulate_one(key, x0, dt, u_scalar):
-        state0 = state_cls(
+        state0 = State(
             time=jnp.array(0.0),
             x=x0,
             next_reaction_time=jnp.array(jnp.inf),
@@ -121,10 +134,10 @@ def sample_initial_state(
     * ``("uniform", lo, hi)``: continuous uniform over ``[lo, hi)``.
     * ``("zero",)``: constant zero.
 
-    Mixture / stratified samplers (used in exp 11) are intentionally out of
-    scope for the v0.2 motif library — they're experimental data-design
-    knobs, not motif specifications. Callers needing them should sample x0
-    themselves and skip ``simulate_dataset`` in favour of the BYO path.
+    Mixture / stratified samplers are intentionally out of scope for the
+    v0.2 motif library — they're experimental-design knobs, not motif
+    specifications. Callers needing them should sample ``x0`` themselves
+    and skip ``simulate_dataset`` in favour of the BYO path.
     """
     kind = dist[0]
     if kind == "uniform":
@@ -139,13 +152,13 @@ def sample_initial_state(
 
 
 def flatten_species(x0: np.ndarray, xs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Turn ``(n_envs,)`` initial values + ``(n_envs, n_steps)`` trajectories
-    into flat ``(X_t, dX)`` arrays of length ``n_envs * n_steps``.
+    """Turn ``(n_replicates,)`` initial values + ``(n_replicates, n_steps)`` trajectories
+    into flat ``(X_t, dX)`` arrays of length ``n_replicates * n_steps``.
 
     Each trajectory contributes ``n_steps`` one-step transitions:
     ``X_t[k]`` is the state at step ``k`` and ``dX[k] = X_t[k+1] - X_t[k]``.
     """
-    x_full = np.concatenate([x0[:, None], xs], axis=1)  # (n_envs, n_steps + 1)
+    x_full = np.concatenate([x0[:, None], xs], axis=1)  # (n_replicates, n_steps + 1)
     X_t = x_full[:, :-1].reshape(-1).astype(np.float32)
     X_next = x_full[:, 1:].reshape(-1).astype(np.float32)
     dX = (X_next - X_t).astype(np.float32)

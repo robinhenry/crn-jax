@@ -25,7 +25,7 @@ def main() -> None:
     # Inducible: drive at u = 25 (saturating) for 24 h.
     ds_ind = inducible.simulate_dataset(
         k1,
-        n_envs=4,
+        n_replicates=4,
         n_steps=1440,
         dt=1.0,
         u_dist=("uniform", 25.0, 25.0),  # constant u
@@ -35,7 +35,7 @@ def main() -> None:
     # AND-gate turn-on dynamics is visible.
     ds_ffl = ffl_and.simulate_dataset(
         k2,
-        n_envs=4,
+        n_replicates=4,
         n_steps=2000,
         dt=0.1,
         u_dist=("uniform", 25.0, 25.0),
