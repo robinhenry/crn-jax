@@ -29,7 +29,7 @@ from jax import Array
 from ..kinetics import hill_function
 from ..types import PRNGKey
 from ._common import (
-    ScalarState as State,
+    State,
     flatten_species,
     make_vmap_simulator,
     repeat_input_per_triple,

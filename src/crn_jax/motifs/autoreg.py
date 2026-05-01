@@ -29,7 +29,7 @@ from jax import Array
 
 from ..types import PRNGKey
 from ._common import (
-    ScalarState as State,
+    State,
     flatten_species,
     make_vmap_simulator,
     sample_initial_state,

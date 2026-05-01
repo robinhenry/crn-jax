@@ -1,4 +1,4 @@
-"""Standard GRN motifs for benchmarking system identification.
+"""Standard motifs pre-implemented for convenience.
 
 Each submodule here owns one canonical reaction network:
 
@@ -21,7 +21,7 @@ Two usage patterns are supported.
     from crn_jax.motifs import cascade
 
     ds = cascade.simulate_dataset(jax.random.PRNGKey(0))
-    ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY  # ready for moment matching.
+    ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY  # access trajectories
 
 **BYO.** Pull just the propensity / reaction primitives and feed them
 into :func:`crn_jax.simulate_trajectory` yourself when the convenience

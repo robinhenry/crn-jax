@@ -1,7 +1,6 @@
 """Shared building blocks for the standard GRN motifs.
 
-The motif modules in this package (``inducible``, ``autoreg``, ``cascade``,
-``ffl_and``) all share the same simulation skeleton: a NamedTuple ``State``
+The motif modules in this package all share the same simulation skeleton: a NamedTuple ``State``
 with a ``time`` / ``x`` / ``next_reaction_time`` triple, a per-replicate
 ``simulate_one`` closure that calls :func:`crn_jax.simulate_trajectory`,
 and a ``vmap`` over independent replicates. This module factors those
@@ -9,8 +8,6 @@ ingredients out so each motif file only owns its propensity function,
 ``apply_reaction`` dispatch, default parameters, and the ``simulate_dataset``
 glue that picks initial conditions and inputs.
 """
-
-from __future__ import annotations
 
 from typing import Any, Callable, NamedTuple
 
@@ -20,33 +17,26 @@ import numpy as np
 
 from ..gillespie import simulate_trajectory
 
-# --- State shapes ------------------------------------------------------------
+# --- State shape -------------------------------------------------------------
 # The Gillespie driver only requires a NamedTuple-like state with `time`,
-# `next_reaction_time`, and `_replace`. Motif modules pick whichever shape
-# matches their species count.
+# `next_reaction_time`, and `_replace`. The species count is encoded in the
+# *runtime shape* of `x` (scalar / length-2 / length-3) rather than in the
+# type — there is nothing motif-specific at the static level, so one State
+# class covers all four motifs.
 
 
-class ScalarState(NamedTuple):
-    """State for 1-species motifs (inducible, autoreg)."""
+class State(NamedTuple):
+    """State carried through the Gillespie SSA loop.
 
-    time: jax.Array
-    x: jax.Array  # scalar
-    next_reaction_time: jax.Array
+    The shape of ``x`` is motif-dependent:
 
-
-class Vec2State(NamedTuple):
-    """State for 2-species motifs (cascade)."""
-
-    time: jax.Array
-    x: jax.Array  # length-2 vector [X, Y]
-    next_reaction_time: jax.Array
-
-
-class Vec3State(NamedTuple):
-    """State for 3-species motifs (FFL)."""
+    * scalar for 1-species motifs (``inducible``, ``autoreg``),
+    * length-2 vector ``[X, Y]`` for ``cascade``,
+    * length-3 vector ``[X, Y, Z]`` for ``ffl_and``.
+    """
 
     time: jax.Array
-    x: jax.Array  # length-3 vector [X, Y, Z]
+    x: jax.Array
     next_reaction_time: jax.Array
 
 
