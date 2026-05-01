@@ -104,6 +104,32 @@ times = jnp.arange(1, 201) * 1.0
 
 See the [examples](examples/) folder for more detailed examples.
 
+## Standard motifs
+
+`crn_jax.motifs` ships pre-built canonical reaction networks for benchmarking
+system identification. Each motif exports a uniform surface — `State`, `Params`,
+`propensities_fn`, `apply_reaction`, plus a one-call `simulate_dataset` —
+so swapping systems is a one-line change:
+
+```python
+import jax
+from crn_jax.motifs import cascade
+
+ds = cascade.simulate_dataset(jax.random.PRNGKey(0))
+ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY  # ready for moment matching
+```
+
+The bare primitives also plug into `simulate_trajectory` directly when the
+convenience helper isn't enough (custom `u` schedules, mixture initial
+conditions, etc.).
+
+| motif        | reactions | input | shape                                      |
+| ------------ | --------- | ----- | ------------------------------------------ |
+| `inducible`  | 2         | yes   | Hill-modulated birth-death                 |
+| `autoreg`    | 2         | no    | negative autoregulation (Hill repressor)   |
+| `cascade`    | 4         | yes   | u → X → Y two-stage cascade                |
+| `ffl_and`    | 6         | yes   | C1 feed-forward loop with AND output gate  |
+
 ## API
 
 ```python
