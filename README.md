@@ -52,6 +52,7 @@ poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 - 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
 - ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
 - 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
+- 🎨 **Pre-built motifs** - a series of standard motifs implemented for convenience.
 - 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
 
@@ -104,6 +105,29 @@ times = jnp.arange(1, 201) * 1.0
 
 See the [examples](examples/) folder for more detailed examples.
 
+## Standard motifs
+
+`crn_jax.motifs` provides pre-built canonical reaction networks. Each motif exports a uniform surface: `State`, `Params`, `propensities_fn()`, `apply_reaction()`, plus a one-call `simulate_dataset()`, so generating time series from different systems is a one-line change:
+
+```python
+import jax
+from crn_jax.motifs import cascade
+
+ds = cascade.simulate_dataset(jax.random.PRNGKey(0))
+
+# Access X, Y, u, dX, dY observations
+ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY
+```
+
+The primitive functions (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper `simulate_dataset` isn't enough (e.g., if you need custom `u` schedules, specific initial condition mixtures, etc.).
+
+| motif        | reactions | input | shape                                      |
+| ------------ | --------- | ----- | ------------------------------------------ |
+| `inducible`  | 2         | yes   | Hill-modulated birth-death                 |
+| `autoreg`    | 2         | no    | negative autoregulation (Hill repressor)   |
+| `cascade`    | 4         | yes   | u → X → Y two-stage cascade                |
+| `ffl_and`    | 6         | yes   | C1 feed-forward loop with AND output gate  |
+
 ## API
 
 ```python
@@ -130,5 +154,5 @@ from crn_jax.kinetics import hill_function, sample_lognormal
 ## See Also
 
 * [GillesPy2](https://github.com/StochSS/GillesPy2): C++ optimized Gillespie simulations on CPU.
-* [jax-smfsb](https://github.com/darrenjw/jax-smfsb): JAX implementations of algorithms from the Stochastic Modelling for Systems Biology book.
+* [jax-smfsb](https://github.com/darrenjw/jax-smfsb): JAX implementations of algorithms from the *Stochastic Modelling for Systems Biology* book.
 * [myriad-jax](https://github.com/robinhenry/myriad-jax): RL-style decision making fully in JAX, powered by `grn-jax` at its core.
