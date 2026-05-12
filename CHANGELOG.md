@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.0 (unreleased)
+
+**Breaking:** `crn_jax.motifs` is renamed to `crn_jax.models` and its contents
+are replaced with the 14-model benchmark library described in
+`src/crn_jax/models/library.json` (birth-death, two-stage transcription-
+translation, telegraph promoter, ±autoreg, bistable, linear chain, toggle,
+activator-repressor, mutual activation, coherent FFL, incoherent FFL,
+repressilator, cyclic hybrid ring). The pre-v0.3 models (`inducible`,
+`autoreg`, `cascade`, `ffl_and`) are removed.
+
+- Every model exposes both parameter regimes via `Params.easy()` /
+  `Params.hard()` classmethods, drawn from the packaged `library.json`.
+- `Dataset` is now a single shared NamedTuple with stacked
+  `xs: (n_replicates, n_steps, n_species)` and a `species: tuple[str, ...]`
+  field, replacing the per-species `Xs / Ys / Zs / dX / dY / dZ` fields.
+- `simulate_dataset` no longer accepts a `u_dist`: every model in the new
+  library is autonomous.
+- Example `examples/03_grn_motifs.py` renamed to `examples/03_grn_models.py`
+  and rewritten around the repressilator and toggle switch.
+
 ## v0.2.0
 
 - New `crn_jax.motifs` subpackage: pre-built canonical GRN motifs

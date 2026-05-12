@@ -1,0 +1,1002 @@
+{
+  "library_name": "grn_benchmark_library",
+  "version": "1.0",
+  "parameterization_note": "All propensities are written in a Gillespie-ready lumped Hill-function form. For motifs with canonical published models, params_easy follows the published or BioModels-default regime. params_hard is a more inference-challenging regime chosen to preserve biological plausibility while reducing identifiability.",
+  "motifs": [
+    {
+      "motif_name": "Birth-death",
+      "species": [
+        "X"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> X",
+          "stoichiometry": [
+            1
+          ],
+          "propensity": "alpha"
+        },
+        {
+          "id": "r2",
+          "reaction": "X -> \u2205",
+          "stoichiometry": [
+            -1
+          ],
+          "propensity": "delta * X"
+        }
+      ],
+      "params_easy": {
+        "alpha": 5,
+        "delta": 1
+      },
+      "params_hard": {
+        "alpha": 1,
+        "delta": 1
+      },
+      "source(s)": [
+        "https://www.sciencedirect.com/science/article/pii/S0092867408012439"
+      ],
+      "notes": "Minimal one-species stochastic baseline for testing counting noise, sampling frequency, and exact SSA bookkeeping. Easy is moderate copy number; hard is low copy number."
+    },
+    {
+      "motif_name": "Two-stage transcription-translation",
+      "species": [
+        "M",
+        "P"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> M",
+          "stoichiometry": [
+            1,
+            0
+          ],
+          "propensity": "alpha_M"
+        },
+        {
+          "id": "r2",
+          "reaction": "M -> \u2205",
+          "stoichiometry": [
+            -1,
+            0
+          ],
+          "propensity": "gamma_M * M"
+        },
+        {
+          "id": "r3",
+          "reaction": "M -> M + P",
+          "stoichiometry": [
+            0,
+            1
+          ],
+          "propensity": "k_tl * M"
+        },
+        {
+          "id": "r4",
+          "reaction": "P -> \u2205",
+          "stoichiometry": [
+            0,
+            -1
+          ],
+          "propensity": "delta_P * P"
+        }
+      ],
+      "params_easy": {
+        "alpha_M": 5,
+        "gamma_M": 1,
+        "k_tl": 10,
+        "delta_P": 0.2
+      },
+      "params_hard": {
+        "alpha_M": 1,
+        "gamma_M": 1,
+        "k_tl": 5,
+        "delta_P": 0.5
+      },
+      "source(s)": [
+        "https://link.springer.com/chapter/10.1007/978-3-030-85633-5_13"
+      ],
+      "notes": "Standard stochastic gene-expression baseline with hidden mRNA and protein lag. Easy uses clearer protein accumulation; hard pushes lower copy number and stronger hidden-state effects."
+    },
+    {
+      "motif_name": "Telegraph promoter",
+      "species": [
+        "S",
+        "M",
+        "P"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "S=0 -> S=1",
+          "stoichiometry": [
+            1,
+            0,
+            0
+          ],
+          "propensity": "k_on * (1 - S)"
+        },
+        {
+          "id": "r2",
+          "reaction": "S=1 -> S=0",
+          "stoichiometry": [
+            -1,
+            0,
+            0
+          ],
+          "propensity": "k_off * S"
+        },
+        {
+          "id": "r3",
+          "reaction": "S=1 -> S=1 + M",
+          "stoichiometry": [
+            0,
+            1,
+            0
+          ],
+          "propensity": "beta * S"
+        },
+        {
+          "id": "r4",
+          "reaction": "M -> \u2205",
+          "stoichiometry": [
+            0,
+            -1,
+            0
+          ],
+          "propensity": "gamma_M * M"
+        },
+        {
+          "id": "r5",
+          "reaction": "M -> M + P",
+          "stoichiometry": [
+            0,
+            0,
+            1
+          ],
+          "propensity": "k_tl * M"
+        },
+        {
+          "id": "r6",
+          "reaction": "P -> \u2205",
+          "stoichiometry": [
+            0,
+            0,
+            -1
+          ],
+          "propensity": "delta_P * P"
+        }
+      ],
+      "params_easy": {
+        "k_on": 1,
+        "k_off": 1,
+        "beta": 5,
+        "gamma_M": 1,
+        "k_tl": 10,
+        "delta_P": 0.2
+      },
+      "params_hard": {
+        "k_on": 0.2,
+        "k_off": 0.2,
+        "beta": 10,
+        "gamma_M": 1,
+        "k_tl": 10,
+        "delta_P": 0.2
+      },
+      "source(s)": [
+        "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1012118"
+      ],
+      "notes": "Canonical two-state bursting model for single-cell expression. Easy uses balanced switching; hard uses slower promoter dynamics and stronger bursts, which makes latent-state inference harder."
+    },
+    {
+      "motif_name": "Negative autoregulation",
+      "species": [
+        "X"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> X",
+          "stoichiometry": [
+            1
+          ],
+          "propensity": "beta_0 + beta_1 * (K^n / (K^n + X^n))"
+        },
+        {
+          "id": "r2",
+          "reaction": "X -> \u2205",
+          "stoichiometry": [
+            -1
+          ],
+          "propensity": "delta * X"
+        }
+      ],
+      "params_easy": {
+        "beta_0": 0,
+        "beta_1": 5,
+        "K": 1,
+        "n": 1,
+        "delta": 1
+      },
+      "params_hard": {
+        "beta_0": 0,
+        "beta_1": 5,
+        "K": 1,
+        "n": 2,
+        "delta": 1
+      },
+      "source(s)": [
+        "https://mcb111.org/w11/w11-lecture.html",
+        "https://www.cs.helsinki.fi/u/lmsalmel/cmsb09/lectures/CompMSysBio2009-Lecture5.pdf",
+        "https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/madar-arabinosepaper.pdf"
+      ],
+      "notes": "One-node feedback motif that speeds response and suppresses noise. Easy follows the standard normalized teaching example; hard increases cooperativity to make inference more nonlinear."
+    },
+    {
+      "motif_name": "Positive autoregulation",
+      "species": [
+        "X"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> X",
+          "stoichiometry": [
+            1
+          ],
+          "propensity": "beta_0 + beta_1 * (X^n / (K^n + X^n))"
+        },
+        {
+          "id": "r2",
+          "reaction": "X -> \u2205",
+          "stoichiometry": [
+            -1
+          ],
+          "propensity": "delta * X"
+        }
+      ],
+      "params_easy": {
+        "beta_0": 0.01,
+        "beta_1": 5,
+        "K": 1,
+        "n": 1,
+        "delta": 1
+      },
+      "params_hard": {
+        "beta_0": 0.01,
+        "beta_1": 8,
+        "K": 1,
+        "n": 2,
+        "delta": 1
+      },
+      "source(s)": [
+        "https://mcb111.org/w11/w11-lecture.html",
+        "https://www.cs.helsinki.fi/u/lmsalmel/cmsb09/lectures/CompMSysBio2009-Lecture5.pdf"
+      ],
+      "notes": "One-node positive feedback motif, often used to slow responses and create switch-like behavior. Easy keeps it graded; hard makes the self-reinforcement more threshold-like."
+    },
+    {
+      "motif_name": "Bistable self-activation",
+      "species": [
+        "X"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> X",
+          "stoichiometry": [
+            1
+          ],
+          "propensity": "beta_0 + beta_1 * (X^n / (K^n + X^n))"
+        },
+        {
+          "id": "r2",
+          "reaction": "X -> \u2205",
+          "stoichiometry": [
+            -1
+          ],
+          "propensity": "delta * X"
+        }
+      ],
+      "params_easy": {
+        "beta_0": 0.01,
+        "beta_1": 8,
+        "K": 1,
+        "n": 2,
+        "delta": 1
+      },
+      "params_hard": {
+        "beta_0": 0.001,
+        "beta_1": 12,
+        "K": 1,
+        "n": 4,
+        "delta": 1
+      },
+      "source(s)": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC4398428/"
+      ],
+      "notes": "Self-activating gene with cooperative feedback, used as a minimal bistable switch. Easy sits near the standard Hill-cooperative regime; hard increases cooperativity and lowers basal leakage to sharpen the two-state behavior."
+    },
+    {
+      "motif_name": "Linear activation chain",
+      "species": [
+        "A",
+        "B"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0
+          ],
+          "propensity": "alpha_A"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1
+          ],
+          "propensity": "beta_B0 + beta_B1 * (A^n_A / (K_A^n_A + A^n_A))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1
+          ],
+          "propensity": "delta_B * B"
+        }
+      ],
+      "params_easy": {
+        "alpha_A": 5,
+        "delta_A": 1,
+        "beta_B0": 0.05,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 1,
+        "delta_B": 1
+      },
+      "params_hard": {
+        "alpha_A": 1,
+        "delta_A": 1,
+        "beta_B0": 0.01,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 2,
+        "delta_B": 1
+      },
+      "source(s)": [
+        "https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/network_motifs_nature_genetics_review.pdf"
+      ],
+      "notes": "Two-node causal chain used to test lag inference and indirect-effect confounding. Easy is smoothly driven; hard reduces molecule counts and makes B more nonlinear."
+    },
+    {
+      "motif_name": "Toggle switch",
+      "species": [
+        "A",
+        "B"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0
+          ],
+          "propensity": "beta_A0 + beta_A1 * (K_B^n_B / (K_B^n_B + B^n_B))"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1
+          ],
+          "propensity": "beta_B0 + beta_B1 * (K_A^n_A / (K_A^n_A + A^n_A))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1
+          ],
+          "propensity": "delta_B * B"
+        }
+      ],
+      "params_easy": {
+        "beta_A0": 15.6,
+        "beta_A1": 156.25,
+        "beta_B0": 0.0,
+        "beta_B1": 15.6,
+        "K_A": 2.0015,
+        "K_B": 2.9618e-05,
+        "n_A": 1,
+        "n_B": 2.5,
+        "delta_A": 1,
+        "delta_B": 1
+      },
+      "params_hard": {
+        "beta_A0": 10,
+        "beta_A1": 100,
+        "beta_B0": 0.0,
+        "beta_B1": 10,
+        "K_A": 1.5,
+        "K_B": 0.01,
+        "n_A": 2,
+        "n_B": 2,
+        "delta_A": 1,
+        "delta_B": 1
+      },
+      "source(s)": [
+        "https://www.nature.com/articles/35002131",
+        "https://www.imagwiki.nibib.nih.gov/sites/default/files/jsim/models/biomodels/BIOMD0000000507.mod",
+        "https://www.omicsdi.org/dataset/biomodels/BIOMD0000000507"
+      ],
+      "notes": "Canonical bistable mutual-inhibition motif. Easy uses the published BioModels parameterization; hard moves closer to the switching boundary by reducing asymmetry and steepness."
+    },
+    {
+      "motif_name": "Activator-repressor pair",
+      "species": [
+        "A",
+        "B"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0
+          ],
+          "propensity": "beta_A0 + beta_A1 * (K_B^n_B / (K_B^n_B + B^n_B))"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1
+          ],
+          "propensity": "beta_B0 + beta_B1 * (A^n_A / (K_A^n_A + A^n_A))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1
+          ],
+          "propensity": "delta_B * B"
+        }
+      ],
+      "params_easy": {
+        "beta_A0": 0.05,
+        "beta_A1": 5,
+        "K_B": 1,
+        "n_B": 1,
+        "delta_A": 1,
+        "beta_B0": 0.05,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 1,
+        "delta_B": 1
+      },
+      "params_hard": {
+        "beta_A0": 0.01,
+        "beta_A1": 5,
+        "K_B": 1,
+        "n_B": 2,
+        "delta_A": 1,
+        "beta_B0": 0.01,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 2,
+        "delta_B": 1
+      },
+      "source(s)": [
+        "https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/network_motifs_nature_genetics_review.pdf"
+      ],
+      "notes": "Two-node feedback motif with mixed sign. Easy keeps both edges smooth; hard increases cooperativity so the causal loop becomes more nonlinear and harder to separate from indirect effects."
+    },
+    {
+      "motif_name": "Mutual activation",
+      "species": [
+        "A",
+        "B"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0
+          ],
+          "propensity": "beta_A0 + beta_A1 * (B^n_B / (K_B^n_B + B^n_B))"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1
+          ],
+          "propensity": "beta_B0 + beta_B1 * (A^n_A / (K_A^n_A + A^n_A))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1
+          ],
+          "propensity": "delta_B * B"
+        }
+      ],
+      "params_easy": {
+        "beta_A0": 0.05,
+        "beta_A1": 5,
+        "K_B": 1,
+        "n_B": 1,
+        "delta_A": 1,
+        "beta_B0": 0.05,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 1,
+        "delta_B": 1
+      },
+      "params_hard": {
+        "beta_A0": 0.01,
+        "beta_A1": 5,
+        "K_B": 1,
+        "n_B": 2,
+        "delta_A": 1,
+        "beta_B0": 0.01,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 2,
+        "delta_B": 1
+      },
+      "source(s)": [
+        "https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/network_motifs_nature_genetics_review.pdf"
+      ],
+      "notes": "Positive mutual feedback motif that can amplify small fluctuations and create multistability. Easy is graded activation; hard is more threshold-like and therefore more inference-challenging."
+    },
+    {
+      "motif_name": "Coherent feed-forward loop (AND gate)",
+      "species": [
+        "X",
+        "Y",
+        "Z"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "X -> \u2205",
+          "stoichiometry": [
+            -1,
+            0,
+            0
+          ],
+          "propensity": "a * X"
+        },
+        {
+          "id": "r2",
+          "reaction": "\u2205 -> Y",
+          "stoichiometry": [
+            0,
+            1,
+            0
+          ],
+          "propensity": "a * piecewise(1, X >= Ty, 0)"
+        },
+        {
+          "id": "r3",
+          "reaction": "Y -> \u2205",
+          "stoichiometry": [
+            0,
+            -1,
+            0
+          ],
+          "propensity": "a * Y"
+        },
+        {
+          "id": "r4",
+          "reaction": "\u2205 -> Z",
+          "stoichiometry": [
+            0,
+            0,
+            1
+          ],
+          "propensity": "piecewise(1, X >= Ty, 0) * piecewise(1, Y >= Tz, 0)"
+        },
+        {
+          "id": "r5",
+          "reaction": "Z -> \u2205",
+          "stoichiometry": [
+            0,
+            0,
+            -1
+          ],
+          "propensity": "a * Z"
+        }
+      ],
+      "params_easy": {
+        "a": 1,
+        "Ty": 0.5,
+        "Tz": 0.5
+      },
+      "params_hard": {
+        "a": 1,
+        "Ty": 0.7,
+        "Tz": 0.3
+      },
+      "source(s)": [
+        "https://www.ebi.ac.uk/biomodels/BIOMD0000000316",
+        "https://www.sciencedirect.com/science/article/pii/S0022283603012038"
+      ],
+      "notes": "Canonical coherent FFL with AND logic. Easy follows the BioModels default thresholds; hard shifts thresholds to make persistence detection and timing inference less trivial."
+    },
+    {
+      "motif_name": "Incoherent feed-forward loop",
+      "species": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0,
+            0
+          ],
+          "propensity": "alpha_A"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1,
+            0
+          ],
+          "propensity": "beta_B0 + beta_B1 * (A^n_A / (K_A^n_A + A^n_A))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1,
+            0
+          ],
+          "propensity": "delta_B * B"
+        },
+        {
+          "id": "r5",
+          "reaction": "\u2205 -> C",
+          "stoichiometry": [
+            0,
+            0,
+            1
+          ],
+          "propensity": "beta_C0 + beta_C1 * (A^n_A / (K_A^n_A + A^n_A)) * (K_B^n_B / (K_B^n_B + B^n_B))"
+        },
+        {
+          "id": "r6",
+          "reaction": "C -> \u2205",
+          "stoichiometry": [
+            0,
+            0,
+            -1
+          ],
+          "propensity": "delta_C * C"
+        }
+      ],
+      "params_easy": {
+        "alpha_A": 5,
+        "delta_A": 1,
+        "beta_B0": 0.05,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 1,
+        "delta_B": 1,
+        "beta_C0": 0.05,
+        "beta_C1": 5,
+        "K_B": 1,
+        "n_B": 1,
+        "delta_C": 1
+      },
+      "params_hard": {
+        "alpha_A": 1,
+        "delta_A": 1,
+        "beta_B0": 0.01,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 2,
+        "delta_B": 1,
+        "beta_C0": 0.01,
+        "beta_C1": 5,
+        "K_B": 1,
+        "n_B": 2,
+        "delta_C": 1
+      },
+      "source(s)": [
+        "https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/network_motifs_nature_genetics_review.pdf",
+        "https://www.omicsdi.org/dataset/biomodels/BIOMD0000000696"
+      ],
+      "notes": "Canonical adaptive FFL motif; it is useful for pulse generation and sign-discrepancy behavior. Easy is a smooth activation-repression cascade; hard sharpens the repressing branch and reduces basal expression."
+    },
+    {
+      "motif_name": "Repressilator",
+      "species": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0,
+            0
+          ],
+          "propensity": "beta_A0 + beta_A1 * (K_C^n / (K_C^n + C^n))"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1,
+            0
+          ],
+          "propensity": "beta_B0 + beta_B1 * (K_A^n / (K_A^n + A^n))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1,
+            0
+          ],
+          "propensity": "delta_B * B"
+        },
+        {
+          "id": "r5",
+          "reaction": "\u2205 -> C",
+          "stoichiometry": [
+            0,
+            0,
+            1
+          ],
+          "propensity": "beta_C0 + beta_C1 * (K_B^n / (K_B^n + B^n))"
+        },
+        {
+          "id": "r6",
+          "reaction": "C -> \u2205",
+          "stoichiometry": [
+            0,
+            0,
+            -1
+          ],
+          "propensity": "delta_C * C"
+        }
+      ],
+      "params_easy": {
+        "beta_A0": 0.03,
+        "beta_A1": 29.97,
+        "beta_B0": 0.03,
+        "beta_B1": 29.97,
+        "beta_C0": 0.03,
+        "beta_C1": 29.97,
+        "K_A": 40,
+        "K_B": 40,
+        "K_C": 40,
+        "n": 2,
+        "delta_A": 0.347,
+        "delta_B": 0.347,
+        "delta_C": 0.347
+      },
+      "params_hard": {
+        "beta_A0": 0.03,
+        "beta_A1": 20,
+        "beta_B0": 0.03,
+        "beta_B1": 20,
+        "beta_C0": 0.03,
+        "beta_C1": 20,
+        "K_A": 40,
+        "K_B": 40,
+        "K_C": 40,
+        "n": 1.5,
+        "delta_A": 0.347,
+        "delta_B": 0.347,
+        "delta_C": 0.347
+      },
+      "source(s)": [
+        "https://www.ebi.ac.uk/biomodels/BIOMD0000000012",
+        "https://github.com/biomodels/BIOMD0000000012/blob/master/README.md"
+      ],
+      "notes": "Canonical synthetic oscillator. Easy follows the BioModels parameterization derived from the original paper; hard reduces cooperativity and transcriptional drive to move closer to the oscillation boundary."
+    },
+    {
+      "motif_name": "Cyclic hybrid ring",
+      "species": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reactions": [
+        {
+          "id": "r1",
+          "reaction": "\u2205 -> A",
+          "stoichiometry": [
+            1,
+            0,
+            0
+          ],
+          "propensity": "beta_A0 + beta_A1 * (K_C^n_C / (K_C^n_C + C^n_C))"
+        },
+        {
+          "id": "r2",
+          "reaction": "A -> \u2205",
+          "stoichiometry": [
+            -1,
+            0,
+            0
+          ],
+          "propensity": "delta_A * A"
+        },
+        {
+          "id": "r3",
+          "reaction": "\u2205 -> B",
+          "stoichiometry": [
+            0,
+            1,
+            0
+          ],
+          "propensity": "beta_B0 + beta_B1 * (A^n_A / (K_A^n_A + A^n_A))"
+        },
+        {
+          "id": "r4",
+          "reaction": "B -> \u2205",
+          "stoichiometry": [
+            0,
+            -1,
+            0
+          ],
+          "propensity": "delta_B * B"
+        },
+        {
+          "id": "r5",
+          "reaction": "\u2205 -> C",
+          "stoichiometry": [
+            0,
+            0,
+            1
+          ],
+          "propensity": "beta_C0 + beta_C1 * (K_B^n_B / (K_B^n_B + B^n_B))"
+        },
+        {
+          "id": "r6",
+          "reaction": "C -> \u2205",
+          "stoichiometry": [
+            0,
+            0,
+            -1
+          ],
+          "propensity": "delta_C * C"
+        }
+      ],
+      "params_easy": {
+        "beta_A0": 0.05,
+        "beta_A1": 5,
+        "K_C": 1,
+        "n_C": 1,
+        "delta_A": 1,
+        "beta_B0": 0.05,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 1,
+        "delta_B": 1,
+        "beta_C0": 0.05,
+        "beta_C1": 5,
+        "K_B": 1,
+        "n_B": 1,
+        "delta_C": 1
+      },
+      "params_hard": {
+        "beta_A0": 0.01,
+        "beta_A1": 5,
+        "K_C": 1,
+        "n_C": 2,
+        "delta_A": 1,
+        "beta_B0": 0.01,
+        "beta_B1": 5,
+        "K_A": 1,
+        "n_A": 2,
+        "delta_B": 1,
+        "beta_C0": 0.01,
+        "beta_C1": 5,
+        "K_B": 1,
+        "n_B": 2,
+        "delta_C": 1
+      },
+      "source(s)": [
+        "https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/network_motifs_nature_genetics_review.pdf"
+      ],
+      "notes": "Synthetic three-node hybrid ring useful for testing mixed-sign feedback and causal ambiguity. Easy is a smooth default; hard sharpens all regulatory edges and lowers leakiness."
+    }
+  ]
+}

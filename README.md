@@ -52,7 +52,7 @@ poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 - 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
 - ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
 - 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
-- 🎨 **Pre-built motifs** - a series of standard motifs implemented for convenience.
+- 🎨 **Pre-built models** - a library of 14 canonical GRN systems (oscillators, switches, FFLs, …) with easy/hard parameter regimes.
 - 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
 
@@ -105,28 +105,43 @@ times = jnp.arange(1, 201) * 1.0
 
 See the [examples](examples/) folder for more detailed examples.
 
-## Standard motifs
+## Pre-built models
 
-`crn_jax.motifs` provides pre-built canonical reaction networks. Each motif exports a uniform surface: `State`, `Params`, `propensities_fn()`, `apply_reaction()`, plus a one-call `simulate_dataset()`, so generating time series from different systems is a one-line change:
+`crn_jax.models` provides 14 canonical GRN reaction networks taken from the literature (see [`library.json`](src/crn_jax/models/library.json) for parameter sources). Each model exports a uniform surface — `Params` with `.easy()` / `.hard()` factory methods, `propensities_fn()`, `apply_reaction()`, and a one-call `simulate_dataset()` — so swapping systems in benchmarks is a one-line change:
 
 ```python
 import jax
-from crn_jax.motifs import cascade
+from crn_jax.models import repressilator
 
-ds = cascade.simulate_dataset(jax.random.PRNGKey(0))
+ds = repressilator.simulate_dataset(jax.random.PRNGKey(0))
 
-# Access X, Y, u, dX, dY observations
-ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY
+# All models share the same Dataset shape.
+ds.species    # ("A", "B", "C")
+ds.xs         # (n_replicates, n_steps, n_species) — full trajectories
+ds.X_t, ds.dX # (n_replicates * n_steps, n_species) — flat one-step transitions
+
+# Switch regime with a single call.
+ds_hard = repressilator.simulate_dataset(jax.random.PRNGKey(0), params=repressilator.Params.hard())
 ```
 
-The primitive functions (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper `simulate_dataset` isn't enough (e.g., if you need custom `u` schedules, specific initial condition mixtures, etc.).
+The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper isn't enough (custom schedules, non-uniform initial conditions, …).
 
-| motif        | reactions | input | shape                                      |
-| ------------ | --------- | ----- | ------------------------------------------ |
-| `inducible`  | 2         | yes   | Hill-modulated birth-death                 |
-| `autoreg`    | 2         | no    | negative autoregulation (Hill repressor)   |
-| `cascade`    | 4         | yes   | u → X → Y two-stage cascade                |
-| `ffl_and`    | 6         | yes   | C1 feed-forward loop with AND output gate  |
+| model                  | species   | reactions | shape                                       |
+| ---------------------- | --------- | --------- | ------------------------------------------- |
+| `birth_death`          | X         | 2         | minimal one-species baseline                |
+| `two_stage`            | M, P      | 4         | transcription-translation w/ hidden mRNA    |
+| `telegraph`            | S, M, P   | 6         | bursting two-state promoter                 |
+| `negative_autoreg`     | X         | 2         | Hill-repressed self-feedback                |
+| `positive_autoreg`     | X         | 2         | Hill self-activation                        |
+| `bistable`             | X         | 2         | self-activation in the bistable regime      |
+| `linear_chain`         | A, B      | 4         | A → B causal chain                          |
+| `toggle`               | A, B      | 4         | mutual inhibition (BIOMD0000000507)         |
+| `activator_repressor`  | A, B      | 4         | A → B, B ⊣ A mixed-sign loop                |
+| `mutual_activation`    | A, B      | 4         | A ↔ B positive mutual feedback              |
+| `coherent_ffl`         | X, Y, Z   | 5         | AND-gate FFL with Heaviside thresholds      |
+| `incoherent_ffl`       | A, B, C   | 6         | adaptive / pulse-generating FFL             |
+| `repressilator`        | A, B, C   | 6         | synthetic oscillator (BIOMD0000000012)      |
+| `cyclic_ring`          | A, B, C   | 6         | three-node mixed-sign feedback ring         |
 
 ## API
 
