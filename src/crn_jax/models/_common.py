@@ -17,9 +17,9 @@ shape (:class:`Dataset`), the JIT+vmap batch-simulator factory
 function :func:`run_dataset` that the per-model ``simulate_dataset``
 wrappers call into.
 
-All 14 models in this library are autonomous: their ``propensities_fn``
-takes ``(state, u)`` only because the Gillespie driver's signature requires
-it, and the ``u`` argument is ignored. :func:`make_vmap_simulator` calls
+Every model in this library is autonomous: its ``propensities_fn`` takes
+``(state, u)`` only because the Gillespie driver's signature requires it,
+and the ``u`` argument is ignored. :func:`make_vmap_simulator` calls
 :func:`simulate_trajectory` with ``inputs=None`` so the driver skips the
 input-change invalidation it would otherwise perform.
 """
@@ -113,7 +113,7 @@ def make_vmap_simulator(
         A :class:`BatchSimulator` that vmaps the per-trajectory simulation
         over ``keys`` and ``x0_batch``. ``inputs=None`` is forwarded to
         :func:`simulate_trajectory` so the driver skips per-step
-        input-change invalidation (all models in this library are
+        input-change invalidation (every model in this library is
         autonomous).
     """
 

@@ -52,7 +52,7 @@ poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 - 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
 - ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
 - 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
-- 🎨 **Pre-built models** - a library of 14 canonical GRN systems (oscillators, switches, FFLs, …) with easy/hard parameter regimes.
+- 🎨 **Pre-built models** - a library of canonical GRN systems (oscillators, switches, FFLs, …) with easy/hard parameter regimes.
 - 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
 
@@ -107,7 +107,7 @@ See the [examples](examples/) folder for more detailed examples.
 
 ## Pre-built models
 
-`crn_jax.models` provides 14 canonical GRN reaction networks taken from the literature (see [`library.json`](src/crn_jax/models/library.json) for parameter sources). Each model exports a uniform surface — `Params` with `.easy()` / `.hard()` factory methods, `propensities_fn()`, `apply_reaction()`, and a one-call `simulate_dataset()` — so swapping systems in benchmarks is a one-line change:
+`crn_jax.models` provides a library of canonical GRN reaction networks taken from the literature (see [`library.json`](src/crn_jax/models/library.json) for the full list and parameter sources). Each model exports a uniform surface — `Params` with `.easy()` / `.hard()` factory methods, `propensities_fn()`, `apply_reaction()`, and a one-call `simulate_dataset()` — so swapping systems in benchmarks is a one-line change:
 
 ```python
 import jax

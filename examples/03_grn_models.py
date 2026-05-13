@@ -1,6 +1,6 @@
 """Example 03 — using the standard GRN models library.
 
-``crn_jax.models`` ships 14 canonical reaction networks (see
+``crn_jax.models`` ships a library of canonical reaction networks (see
 ``src/crn_jax/models/library.json``). Each model exports the same surface
 (``Params`` with ``.easy()`` / ``.hard()`` factories, ``propensities_fn``,
 ``apply_reaction``, ``simulate_dataset``) so dropping a different system
