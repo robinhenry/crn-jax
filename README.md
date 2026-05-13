@@ -107,24 +107,34 @@ See the [examples](examples/) folder for more detailed examples.
 
 ## Pre-built models
 
-`crn_jax.models` provides a library of canonical GRN reaction networks taken from the literature (see [`library.json`](src/crn_jax/models/library.json) for the full list and parameter sources). Each model exports a uniform surface — `Params` with `.easy()` / `.hard()` factory methods, `propensities_fn()`, `apply_reaction()`, and a one-call `simulate_dataset()` — so swapping systems in benchmarks is a one-line change:
+`crn_jax.models` provides a library of canonical GRN reaction networks taken from the literature (see [`library.json`](src/crn_jax/models/library.json) for the full list and parameter sources). Each model module exposes the same surface — `SPECIES`, `Params` with `.easy()` / `.hard()` factory methods, `propensities_fn()`, `apply_reaction()` — and the one-call entry point lives at the package level. Swapping systems in benchmarks is a one-argument change:
 
 ```python
-import jax
-from crn_jax.models import repressilator
+import jax, jax.numpy as jnp
+from crn_jax import models
 
-ds = repressilator.simulate_dataset(jax.random.PRNGKey(0))
+# x0 is required and always (n_replicates, n_species): the library does not
+# sample initial conditions for you because the sensible IC is problem-specific.
+n_rep = 32
+key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
+x0 = jax.random.uniform(k_x0, (n_rep, len(models.repressilator.SPECIES)),
+                        minval=0.0, maxval=100.0)
 
-# All models share the same Dataset shape.
+ds = models.simulate_dataset(models.repressilator, key, x0, n_steps=2000, dt=0.1)
+
+# Every Dataset has the same shape.
 ds.species    # ("A", "B", "C")
 ds.xs         # (n_replicates, n_steps, n_species) — full trajectories
 ds.X_t, ds.dX # (n_replicates * n_steps, n_species) — flat one-step transitions
 
-# Switch regime with a single call.
-ds_hard = repressilator.simulate_dataset(jax.random.PRNGKey(0), params=repressilator.Params.hard())
+# Switch regime by passing different Params.
+ds_hard = models.simulate_dataset(
+    models.repressilator, key, x0, params=models.repressilator.Params.hard(),
+    n_steps=2000, dt=0.1,
+)
 ```
 
-The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper isn't enough (custom schedules, non-uniform initial conditions, …).
+The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper isn't enough (custom schedules, per-trajectory dt, …).
 
 | model                  | species   | reactions | shape                                       |
 | ---------------------- | --------- | --------- | ------------------------------------------- |

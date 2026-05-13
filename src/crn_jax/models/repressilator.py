@@ -19,20 +19,15 @@ the BioModels source). Defaults give δ ≈ 0.347 (lifetime ≈ 3 min) and
 """
 
 import dataclasses
-import functools
 from typing import Callable
 
 import jax.numpy as jnp
 from jax import Array
 
 from ..kinetics import hill_function
-from ..types import PRNGKey
 from ._common import (
-    Dataset,
     State,
     make_apply_reaction,
-    make_vmap_simulator,
-    run_dataset,
 )
 
 SPECIES: tuple[str, ...] = ("A", "B", "C")
@@ -94,30 +89,3 @@ def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
 
 
 apply_reaction = make_apply_reaction(_STOICH)
-
-
-@functools.lru_cache(maxsize=None)
-def _build_simulator(n_steps: int, params: Params):
-    return make_vmap_simulator(n_steps, propensities_fn(params), apply_reaction)
-
-
-def simulate_dataset(
-    key: PRNGKey,
-    *,
-    params: Params = Params(),
-    n_replicates: int = 256,
-    n_steps: int = 2000,
-    dt: float = 0.1,
-    a0_dist: tuple = ("uniform", 0.0, 100.0),
-    b0_dist: tuple = ("uniform", 0.0, 100.0),
-    c0_dist: tuple = ("uniform", 0.0, 100.0),
-) -> Dataset:
-    return run_dataset(
-        key,
-        species=SPECIES,
-        simulator=_build_simulator(n_steps, params),
-        n_replicates=n_replicates,
-        n_steps=n_steps,
-        dt=dt,
-        x0_dists=(a0_dist, b0_dist, c0_dist),
-    )

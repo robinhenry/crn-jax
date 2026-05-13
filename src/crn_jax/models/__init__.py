@@ -1,6 +1,6 @@
 """Pre-built canonical GRN models — the ``crn_jax`` benchmark library.
 
-Each submodule owns one model. They all expose the same surface:
+Each submodule owns one model and exports the same five names:
 
 * ``SPECIES`` — tuple of species names.
 * ``Params`` — frozen dataclass of biochemical constants, with
@@ -8,15 +8,18 @@ Each submodule owns one model. They all expose the same surface:
   parameter regimes shipped in :doc:`library.json`. Defaults match the
   easy regime.
 * ``propensities_fn(params)`` — closure ``(state, u) -> Array[M]`` ready
-  to plug into :func:`crn_jax.simulate_trajectory`. All models are
+  to plug into :func:`crn_jax.simulate_trajectory`. Every model is
   autonomous, so the ``u`` argument is accepted but ignored.
 * ``apply_reaction(state, j)`` — JAX-compatible state update for reaction
   index ``j``, built from the module-level ``_STOICH`` matrix.
-* ``simulate_dataset(key, …)`` — one-call helper that samples initial
-  conditions, runs a JIT'd vmap'd batch simulator (cached per
-  ``(n_steps, params)``), and returns a :class:`Dataset` with the full
-  trajectory tensor ``xs`` of shape ``(n_replicates, n_steps, n_species)``
-  plus flat one-step transitions ``(X_t, dX)``.
+
+The one-call entry point lives at the package level, not on each module:
+
+* :func:`simulate_dataset(model, key, x0, …) <simulate_dataset>` — run a
+  batch Gillespie simulation of ``model`` on caller-supplied ``x0`` of
+  shape ``(n_replicates, n_species)`` and return a :class:`Dataset`. The
+  underlying JIT'd vmap'd batch simulator is cached on
+  ``(model, params, n_steps)``.
 
 The packaged :doc:`library.json` is the authoritative source for
 ``params_easy`` / ``params_hard`` values and is asserted against the
@@ -26,18 +29,24 @@ Quickstart
 ----------
 ::
 
-    import jax
-    from crn_jax.models import repressilator
+    import jax, jax.numpy as jnp
+    from crn_jax import models
 
-    ds = repressilator.simulate_dataset(jax.random.PRNGKey(0))
-    ds.xs.shape       # (n_replicates, n_steps, 3)
+    n_rep = 32
+    key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
+    x0 = jax.random.uniform(k_x0, (n_rep, len(models.repressilator.SPECIES)),
+                            minval=0.0, maxval=100.0)
+
+    ds = models.simulate_dataset(models.repressilator, key, x0, n_steps=2000, dt=0.1)
+    ds.xs.shape       # (32, 2000, 3)
     ds.species        # ("A", "B", "C")
-    ds.X_t, ds.dX     # (n_replicates * n_steps, 3) flat transitions
+    ds.X_t, ds.dX     # (32 * 2000, 3) flat transitions
 
 Bring-your-own
 --------------
 The primitives plug straight into :func:`crn_jax.simulate_trajectory` when
-the convenience helper isn't enough (custom schedules, non-uniform x0)::
+the convenience helper isn't enough (custom schedules, per-trajectory dt,
+…)::
 
     from crn_jax import simulate_trajectory
     from crn_jax.models import toggle
@@ -67,7 +76,7 @@ from . import (
     toggle,
     two_stage,
 )
-from ._common import Dataset, State  # noqa: F401 — re-exported via __all__
+from ._common import Dataset, State, simulate_dataset  # noqa: F401 — re-exported via __all__
 
 # Convenience: an ordered tuple of every model module in the library.
 # Useful for iterating ("for m in ALL_MODELS: ...") and for parameter
@@ -89,4 +98,12 @@ ALL_MODELS = (
     cyclic_ring,
 )
 
-__all__ = sorted(["ALL_MODELS", "Dataset", "State", *(m.__name__.rsplit(".", 1)[-1] for m in ALL_MODELS)])
+__all__ = sorted(
+    [
+        "ALL_MODELS",
+        "Dataset",
+        "State",
+        "simulate_dataset",
+        *(m.__name__.rsplit(".", 1)[-1] for m in ALL_MODELS),
+    ]
+)

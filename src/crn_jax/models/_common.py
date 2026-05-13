@@ -1,21 +1,22 @@
 """Shared building blocks for the standard GRN models.
 
-Every model module in this package follows the same skeleton:
+Every model module in this package is just the math:
 
-* a frozen :class:`Params` dataclass with ``Params.easy()`` / ``Params.hard()``
-  classmethods drawn from the packaged :mod:`library.json`,
-* a ``propensities_fn(params) -> (state, u) -> Array[M]`` closure factory,
-* a module-level stoichiometry matrix plus an :func:`apply_reaction` built
-  from it,
-* an ``@functools.lru_cache``-d ``_build_simulator(n_steps, params)`` that
-  returns a JIT'd batch simulator, and
-* a one-call ``simulate_dataset(key, …)`` that delegates to :func:`run_dataset`.
+* ``SPECIES`` — tuple of species names.
+* ``_STOICH`` — reaction-by-species stoichiometry matrix.
+* ``Params`` — frozen dataclass with ``easy()`` / ``hard()`` factories.
+* ``propensities_fn(params) -> (state, u) -> Array[M]`` closure factory.
+* ``apply_reaction = make_apply_reaction(_STOICH)``.
 
-This file owns the shared state shape (:class:`State`), the shared output
-shape (:class:`Dataset`), the JIT+vmap batch-simulator factory
-(:func:`make_vmap_simulator`), initial-condition sampling, and the glue
-function :func:`run_dataset` that the per-model ``simulate_dataset``
-wrappers call into.
+The one-call entry point is :func:`simulate_dataset` in this module; it
+takes a model module plus caller-supplied ``x0`` and returns a
+:class:`Dataset`. Default timescale is ``n_steps=1000, dt=0.1`` for every
+model; the caller picks something appropriate per system.
+
+Initial conditions are always supplied by the caller as an ``x0`` array
+of shape ``(n_replicates, n_species)``; the library deliberately does not
+sample them for you, because the sensible IC distribution is
+problem-specific and we want it explicit at the call site.
 
 Every model in this library is autonomous: its ``propensities_fn`` takes
 ``(state, u)`` only because the Gillespie driver's signature requires it,
@@ -24,6 +25,7 @@ and the ``u`` argument is ignored. :func:`make_vmap_simulator` calls
 input-change invalidation it would otherwise perform.
 """
 
+import functools
 from typing import Callable, NamedTuple, Protocol
 
 import jax
@@ -44,7 +46,7 @@ class State(NamedTuple):
     """State carried through the Gillespie SSA loop.
 
     ``x`` is always a 1-D ``(n_species,)`` JAX array, even for single-species
-    models — this keeps :func:`run_dataset` uniform across the library.
+    models — this keeps :func:`simulate_dataset` uniform across the library.
     """
 
     time: jax.Array
@@ -66,7 +68,7 @@ class Dataset(NamedTuple):
 
     times: np.ndarray  # (n_steps,) — sample times in `dt` units
     species: tuple[str, ...]  # species names, len == n_species
-    x0: np.ndarray  # (n_replicates, n_species) — sampled initial counts
+    x0: np.ndarray  # (n_replicates, n_species) — initial counts supplied by caller
     xs: np.ndarray  # (n_replicates, n_steps, n_species) — full trajectories
     X_t: np.ndarray  # (n_replicates * n_steps, n_species) — flat per-step state
     dX: np.ndarray  # (n_replicates * n_steps, n_species) — flat one-step delta
@@ -160,46 +162,6 @@ def make_apply_reaction(stoichiometry: tuple[tuple[int, ...], ...]) -> Callable[
     return apply_reaction
 
 
-# --- Initial-condition sampling ---------------------------------------------
-
-DistSpec = tuple  # ("uniform", lo, hi) | ("zero",) | ("bernoulli", p) | ("constant", v)
-
-
-def sample_initial_state(
-    key: jax.Array,
-    shape: tuple[int, ...],
-    dist: DistSpec,
-) -> jax.Array:
-    """Sample initial conditions for one species across replicates.
-
-    Supported distributions:
-
-    * ``("uniform", lo, hi)`` — continuous uniform over ``[lo, hi)``.
-    * ``("zero",)`` — constant zero.
-    * ``("constant", v)`` — constant ``v`` (useful when you want a
-      non-zero deterministic IC for one species).
-    * ``("bernoulli", p)`` — 0/1 draws with ``P(1) = p``. Used by
-      :mod:`crn_jax.models.telegraph` for the binary promoter state.
-
-    Callers needing fancier samplers should sample ``x0`` themselves and
-    skip ``simulate_dataset`` in favour of the BYO path that drives
-    :func:`crn_jax.simulate_trajectory` directly.
-    """
-    kind = dist[0]
-    if kind == "uniform":
-        _, lo, hi = dist
-        return jax.random.uniform(key, shape, minval=float(lo), maxval=float(hi))
-    if kind == "zero":
-        return jnp.zeros(shape)
-    if kind == "constant":
-        _, v = dist
-        return jnp.full(shape, float(v))
-    if kind == "bernoulli":
-        _, p = dist
-        return (jax.random.uniform(key, shape) < float(p)).astype(jnp.float32)
-    raise ValueError(f"Unknown distribution spec: {dist!r}")
-
-
 # --- Trajectory flattening + one-call dataset --------------------------------
 
 
@@ -224,36 +186,68 @@ def flatten_species(x0: np.ndarray, xs: np.ndarray) -> tuple[np.ndarray, np.ndar
     return X_t, dX
 
 
-def run_dataset(
-    key: PRNGKey,
-    *,
-    species: tuple[str, ...],
-    simulator: BatchSimulator,
-    n_replicates: int,
+@functools.lru_cache(maxsize=None)
+def _cached_batch_simulator(
+    propensities_factory: Callable,
+    apply_reaction_fn: Callable,
+    params,
     n_steps: int,
-    dt: float,
-    x0_dists: tuple[DistSpec, ...],
-) -> Dataset:
-    """Run a model's batch simulator and pack the results into a :class:`Dataset`.
+) -> BatchSimulator:
+    """Build (and cache) a JIT'd vmap'd batch simulator for one model.
 
-    Per-model ``simulate_dataset`` functions are thin wrappers around this
-    helper: they choose model-specific defaults for ``n_replicates``,
-    ``n_steps``, ``dt``, and the ``x0_dists`` tuple (one DistSpec per
-    species), then forward everything here.
+    Cache key is ``(propensities_factory, apply_reaction_fn, params,
+    n_steps)``. The factory and apply-reaction are functions (hashable by
+    identity); ``params`` is a frozen dataclass (hashable by value). This
+    means repeated ``simulate_dataset`` calls with the same model and
+    same params reuse the compiled XLA artifact.
     """
-    if len(x0_dists) != len(species):
+    return make_vmap_simulator(n_steps, propensities_factory(params), apply_reaction_fn)
+
+
+def simulate_dataset(
+    model,
+    key: PRNGKey,
+    x0: jax.Array,
+    *,
+    params=None,
+    n_steps: int = 1000,
+    dt: float = 0.1,
+) -> Dataset:
+    """Run ``model`` on caller-supplied ``x0`` and return a :class:`Dataset`.
+
+    The model module is duck-typed: ``simulate_dataset`` reads
+    ``model.SPECIES``, ``model.Params`` (used only when ``params`` is
+    omitted), ``model.propensities_fn``, and ``model.apply_reaction``.
+    Any module in :data:`crn_jax.models.ALL_MODELS` satisfies that surface.
+
+    Args:
+        model: A model module from :mod:`crn_jax.models`.
+        key: PRNG key threaded into the per-replicate Gillespie scans.
+        x0: ``(n_replicates, len(model.SPECIES))`` non-negative initial
+            counts. ``n_replicates`` is inferred from ``x0.shape[0]``.
+        params: Optional model parameters; defaults to ``model.Params()``
+            (the easy regime).
+        n_steps: Number of fixed-interval steps to scan. Default 1000.
+        dt: Width of each interval. Default 0.1.
+
+    Raises:
+        ValueError: ``x0`` has the wrong shape or any negative entry.
+    """
+    if params is None:
+        params = model.Params()
+
+    x0 = jnp.asarray(x0, dtype=jnp.float32)
+    n_species = len(model.SPECIES)
+    if x0.ndim != 2 or x0.shape[1] != n_species:
         raise ValueError(
-            f"x0_dists has length {len(x0_dists)} but species has length {len(species)}; "
-            "one IC distribution per species is required.",
+            f"x0 must have shape (n_replicates, {n_species}) for species {model.SPECIES}; got shape {tuple(x0.shape)}.",
         )
+    if bool((x0 < 0).any()):
+        raise ValueError("x0 must be non-negative (species counts can't be negative).")
 
-    n_species = len(species)
-    key_sim, *key_x0 = jax.random.split(key, n_species + 1)
-
-    x0_cols = [sample_initial_state(k, (n_replicates,), dist) for k, dist in zip(key_x0, x0_dists, strict=True)]
-    x0 = jnp.stack(x0_cols, axis=-1)
-
-    keys = jax.random.split(key_sim, n_replicates)
+    simulator = _cached_batch_simulator(model.propensities_fn, model.apply_reaction, params, n_steps)
+    n_replicates = x0.shape[0]
+    keys = jax.random.split(key, n_replicates)
     states = simulator(keys, x0, dt)
 
     xs = np.asarray(states.x)
@@ -263,7 +257,7 @@ def run_dataset(
     times = np.asarray(jnp.arange(1, n_steps + 1) * dt)
     return Dataset(
         times=times,
-        species=tuple(species),
+        species=tuple(model.SPECIES),
         x0=x0_np,
         xs=xs,
         X_t=X_t,

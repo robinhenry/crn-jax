@@ -15,6 +15,15 @@ repressilator, cyclic hybrid ring). The pre-v0.3 models (`inducible`,
 - `Dataset` is now a single shared NamedTuple with stacked
   `xs: (n_replicates, n_steps, n_species)` and a `species: tuple[str, ...]`
   field, replacing the per-species `Xs / Ys / Zs / dX / dY / dZ` fields.
+- `simulate_dataset` is now a package-level function:
+  `crn_jax.models.simulate_dataset(model, key, x0, ...)`. The caller always
+  supplies `x0: (n_replicates, n_species)`; the library no longer samples
+  initial conditions (the previous per-species `*_dist` kwargs and the
+  internal `DistSpec` are gone). `x0` is validated for shape and
+  non-negativity. `n_replicates` is inferred from `x0.shape[0]`.
+- Each model module is now just the math (`SPECIES`, `Params`,
+  `propensities_fn`, `apply_reaction`); the per-model `simulate_dataset`
+  and `_build_simulator` wrappers are removed.
 - `simulate_dataset` no longer accepts a `u_dist`: every model in the new
   library is autonomous.
 - Example `examples/03_grn_motifs.py` renamed to `examples/03_grn_models.py`

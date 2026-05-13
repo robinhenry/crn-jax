@@ -80,8 +80,9 @@ def test_propensities_finite_and_nonneg(module):
 @parametrize_models
 def test_simulate_dataset_shapes(module):
     n_rep, n_steps = 8, 50
-    ds = module.simulate_dataset(jax.random.PRNGKey(0), n_replicates=n_rep, n_steps=n_steps)
     n_species = len(module.SPECIES)
+    x0 = jnp.zeros((n_rep, n_species))
+    ds = models.simulate_dataset(module, jax.random.PRNGKey(0), x0, n_steps=n_steps)
     assert ds.species == module.SPECIES
     assert ds.xs.shape == (n_rep, n_steps, n_species)
     assert ds.x0.shape == (n_rep, n_species)
@@ -145,13 +146,15 @@ def test_params_match_library_json(motif_entry):
 def test_birth_death_steady_state():
     """``⟨X⟩ → α/δ`` at steady state under the easy regime."""
     p = models.birth_death.Params.easy()
-    ds = models.birth_death.simulate_dataset(
+    n_rep = 128
+    x0 = jnp.full((n_rep, 1), p.alpha / p.delta)
+    ds = models.simulate_dataset(
+        models.birth_death,
         jax.random.PRNGKey(0),
+        x0,
         params=p,
-        n_replicates=128,
         n_steps=2000,
         dt=0.05,
-        x0_dist=("constant", p.alpha / p.delta),
     )
     analytic = p.alpha / p.delta
     second_half = ds.xs[:, ds.xs.shape[1] // 2 :, 0]
@@ -175,13 +178,10 @@ def test_negative_autoreg_steady_state():
             hi = mid
     analytic = 0.5 * (lo + hi)
 
-    ds = models.negative_autoreg.simulate_dataset(
-        jax.random.PRNGKey(0),
-        params=p,
-        n_replicates=128,
-        n_steps=2000,
-        dt=0.05,
-    )
+    n_rep = 128
+    key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
+    x0 = jax.random.uniform(k_x0, (n_rep, 1), minval=0.0, maxval=10.0)
+    ds = models.simulate_dataset(models.negative_autoreg, key, x0, params=p, n_steps=2000, dt=0.05)
     mean = float(ds.xs[:, ds.xs.shape[1] // 2 :, 0].mean())
     assert abs(mean - analytic) / max(analytic, 1.0) < 0.15, f"mean={mean}, analytic={analytic}"
 
@@ -189,28 +189,14 @@ def test_negative_autoreg_steady_state():
 def test_coherent_ffl_pulse_through():
     """X(0) above threshold → Z eventually nonzero; X(0) below threshold → Z stays at 0."""
     p = models.coherent_ffl.Params.easy()
-    # X above threshold for all replicates.
-    ds_on = models.coherent_ffl.simulate_dataset(
-        jax.random.PRNGKey(0),
-        params=p,
-        n_replicates=32,
-        n_steps=200,
-        dt=0.05,
-        x0_dist=("constant", 5.0),
-        y0_dist=("zero",),
-        z0_dist=("zero",),
-    )
-    # X always below threshold.
-    ds_off = models.coherent_ffl.simulate_dataset(
-        jax.random.PRNGKey(1),
-        params=p,
-        n_replicates=32,
-        n_steps=200,
-        dt=0.05,
-        x0_dist=("zero",),
-        y0_dist=("zero",),
-        z0_dist=("zero",),
-    )
+    n_rep = 32
+
+    # X above threshold for all replicates; Y, Z start at 0.
+    x0_on = jnp.stack([jnp.full((n_rep,), 5.0), jnp.zeros((n_rep,)), jnp.zeros((n_rep,))], axis=-1)
+    ds_on = models.simulate_dataset(models.coherent_ffl, jax.random.PRNGKey(0), x0_on, params=p, n_steps=200, dt=0.05)
+    # X identically zero — below threshold everywhere.
+    x0_off = jnp.zeros((n_rep, 3))
+    ds_off = models.simulate_dataset(models.coherent_ffl, jax.random.PRNGKey(1), x0_off, params=p, n_steps=200, dt=0.05)
     z_on_max = float(ds_on.xs[..., 2].max())
     z_off_max = float(ds_off.xs[..., 2].max())
     assert z_on_max > 0, "expected coherent-FFL Z to pulse when X starts above threshold"
@@ -219,14 +205,33 @@ def test_coherent_ffl_pulse_through():
 
 def test_telegraph_promoter_stays_binary():
     """The promoter state S must remain in {0, 1} for the duration."""
-    ds = models.telegraph.simulate_dataset(
-        jax.random.PRNGKey(0),
-        n_replicates=32,
-        n_steps=300,
-    )
-    s = ds.xs[..., 0]  # S species
+    n_rep = 32
+    key, k_s, k_m, k_p = jax.random.split(jax.random.PRNGKey(0), 4)
+    s0 = jax.random.bernoulli(k_s, 0.5, (n_rep,)).astype(jnp.float32)
+    m0 = jax.random.uniform(k_m, (n_rep,), minval=0.0, maxval=5.0)
+    p0 = jax.random.uniform(k_p, (n_rep,), minval=0.0, maxval=150.0)
+    x0 = jnp.stack([s0, m0, p0], axis=-1)
+    ds = models.simulate_dataset(models.telegraph, key, x0, n_steps=300)
+    s = ds.xs[..., 0]
     unique = np.unique(s)
     assert set(unique.tolist()).issubset({0.0, 1.0}), f"S left {{0,1}}: unique values {unique}"
+
+
+# --- x0 validation ----------------------------------------------------------
+
+
+def test_simulate_dataset_rejects_wrong_x0_shape():
+    """The wrong species-axis length on ``x0`` raises ``ValueError``."""
+    bad_x0 = jnp.zeros((4, 2))  # birth_death has 1 species, not 2
+    with pytest.raises(ValueError, match="x0 must have shape"):
+        models.simulate_dataset(models.birth_death, jax.random.PRNGKey(0), bad_x0)
+
+
+def test_simulate_dataset_rejects_negative_x0():
+    """A negative entry in ``x0`` raises ``ValueError``."""
+    bad_x0 = jnp.array([[-1.0]])
+    with pytest.raises(ValueError, match="non-negative"):
+        models.simulate_dataset(models.birth_death, jax.random.PRNGKey(0), bad_x0)
 
 
 # --- BYO path test (carried over from old motifs suite) ---------------------
@@ -262,16 +267,19 @@ def test_byo_path_compatible_with_simulate_trajectory():
 
 
 def test_simulate_dataset_reuses_compiled_simulator():
-    """``_build_simulator(n_steps, params)`` must return the same object on
+    """The shared ``_cached_batch_simulator`` must return the same object on
     repeated calls — otherwise every ``simulate_dataset`` invocation re-traces
     a fresh ``@jax.jit`` closure."""
-    p = models.birth_death.Params()
-    run1 = models.birth_death._build_simulator(200, p)
-    run2 = models.birth_death._build_simulator(200, p)
+    from crn_jax.models._common import _cached_batch_simulator
+
+    bd = models.birth_death
+    p = bd.Params()
+    run1 = _cached_batch_simulator(bd.propensities_fn, bd.apply_reaction, p, 200)
+    run2 = _cached_batch_simulator(bd.propensities_fn, bd.apply_reaction, p, 200)
     assert run1 is run2, "expected the same compiled simulator object"
 
-    run3 = models.birth_death._build_simulator(400, p)
+    run3 = _cached_batch_simulator(bd.propensities_fn, bd.apply_reaction, p, 400)
     assert run3 is not run1, "different n_steps must be a separate cache entry"
 
-    run4 = models.birth_death._build_simulator(200, models.birth_death.Params(alpha=42.0))
+    run4 = _cached_batch_simulator(bd.propensities_fn, bd.apply_reaction, bd.Params(alpha=42.0), 200)
     assert run4 is not run1, "different params must be a separate cache entry"
