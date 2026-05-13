@@ -3,7 +3,7 @@
 Three classes of checks:
 
 1. **Per-model smoke tests** (parametrised over every module in
-   ``ALL_MODELS``): propensities are finite/non-negative, ``simulate_dataset``
+   ``ALL_MODELS``): propensities are finite/non-negative, ``sample_trajectories``
    returns the documented shapes, ``Params.easy()`` and ``Params.hard()`` are
    distinct.
 2. **Parameter consistency**: load the packaged ``library.json`` and verify
@@ -78,11 +78,11 @@ def test_propensities_finite_and_nonneg(module):
 
 
 @parametrize_models
-def test_simulate_dataset_shapes(module):
+def test_sample_trajectories_shapes(module):
     n_rep, n_steps = 8, 50
     n_species = len(module.SPECIES)
     x0 = jnp.zeros((n_rep, n_species))
-    ds = models.simulate_dataset(module, jax.random.PRNGKey(0), x0, n_steps=n_steps)
+    ds = models.sample_trajectories(module, jax.random.PRNGKey(0), x0, n_steps=n_steps)
     assert ds.species == module.SPECIES
     assert ds.xs.shape == (n_rep, n_steps, n_species)
     assert ds.x0.shape == (n_rep, n_species)
@@ -148,7 +148,7 @@ def test_birth_death_steady_state():
     p = models.birth_death.Params.easy()
     n_rep = 128
     x0 = jnp.full((n_rep, 1), p.alpha / p.delta)
-    ds = models.simulate_dataset(
+    ds = models.sample_trajectories(
         models.birth_death,
         jax.random.PRNGKey(0),
         x0,
@@ -181,7 +181,7 @@ def test_negative_autoreg_steady_state():
     n_rep = 128
     key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
     x0 = jax.random.uniform(k_x0, (n_rep, 1), minval=0.0, maxval=10.0)
-    ds = models.simulate_dataset(models.negative_autoreg, key, x0, params=p, n_steps=2000, dt=0.05)
+    ds = models.sample_trajectories(models.negative_autoreg, key, x0, params=p, n_steps=2000, dt=0.05)
     mean = float(ds.xs[:, ds.xs.shape[1] // 2 :, 0].mean())
     assert abs(mean - analytic) / max(analytic, 1.0) < 0.15, f"mean={mean}, analytic={analytic}"
 
@@ -193,10 +193,14 @@ def test_coherent_ffl_pulse_through():
 
     # X above threshold for all replicates; Y, Z start at 0.
     x0_on = jnp.stack([jnp.full((n_rep,), 5.0), jnp.zeros((n_rep,)), jnp.zeros((n_rep,))], axis=-1)
-    ds_on = models.simulate_dataset(models.coherent_ffl, jax.random.PRNGKey(0), x0_on, params=p, n_steps=200, dt=0.05)
+    ds_on = models.sample_trajectories(
+        models.coherent_ffl, jax.random.PRNGKey(0), x0_on, params=p, n_steps=200, dt=0.05
+    )
     # X identically zero — below threshold everywhere.
     x0_off = jnp.zeros((n_rep, 3))
-    ds_off = models.simulate_dataset(models.coherent_ffl, jax.random.PRNGKey(1), x0_off, params=p, n_steps=200, dt=0.05)
+    ds_off = models.sample_trajectories(
+        models.coherent_ffl, jax.random.PRNGKey(1), x0_off, params=p, n_steps=200, dt=0.05
+    )
     z_on_max = float(ds_on.xs[..., 2].max())
     z_off_max = float(ds_off.xs[..., 2].max())
     assert z_on_max > 0, "expected coherent-FFL Z to pulse when X starts above threshold"
@@ -211,7 +215,7 @@ def test_telegraph_promoter_stays_binary():
     m0 = jax.random.uniform(k_m, (n_rep,), minval=0.0, maxval=5.0)
     p0 = jax.random.uniform(k_p, (n_rep,), minval=0.0, maxval=150.0)
     x0 = jnp.stack([s0, m0, p0], axis=-1)
-    ds = models.simulate_dataset(models.telegraph, key, x0, n_steps=300)
+    ds = models.sample_trajectories(models.telegraph, key, x0, n_steps=300)
     s = ds.xs[..., 0]
     unique = np.unique(s)
     assert set(unique.tolist()).issubset({0.0, 1.0}), f"S left {{0,1}}: unique values {unique}"
@@ -220,18 +224,18 @@ def test_telegraph_promoter_stays_binary():
 # --- x0 validation ----------------------------------------------------------
 
 
-def test_simulate_dataset_rejects_wrong_x0_shape():
+def test_sample_trajectories_rejects_wrong_x0_shape():
     """The wrong species-axis length on ``x0`` raises ``ValueError``."""
     bad_x0 = jnp.zeros((4, 2))  # birth_death has 1 species, not 2
     with pytest.raises(ValueError, match="x0 must have shape"):
-        models.simulate_dataset(models.birth_death, jax.random.PRNGKey(0), bad_x0)
+        models.sample_trajectories(models.birth_death, jax.random.PRNGKey(0), bad_x0)
 
 
-def test_simulate_dataset_rejects_negative_x0():
+def test_sample_trajectories_rejects_negative_x0():
     """A negative entry in ``x0`` raises ``ValueError``."""
     bad_x0 = jnp.array([[-1.0]])
     with pytest.raises(ValueError, match="non-negative"):
-        models.simulate_dataset(models.birth_death, jax.random.PRNGKey(0), bad_x0)
+        models.sample_trajectories(models.birth_death, jax.random.PRNGKey(0), bad_x0)
 
 
 # --- BYO path test (carried over from old motifs suite) ---------------------
@@ -266,9 +270,9 @@ def test_byo_path_compatible_with_simulate_trajectory():
 # --- JIT cache hit ----------------------------------------------------------
 
 
-def test_simulate_dataset_reuses_compiled_simulator():
+def test_sample_trajectories_reuses_compiled_simulator():
     """The shared ``_cached_batch_simulator`` must return the same object on
-    repeated calls — otherwise every ``simulate_dataset`` invocation re-traces
+    repeated calls — otherwise every ``sample_trajectories`` invocation re-traces
     a fresh ``@jax.jit`` closure."""
     from crn_jax.models._common import _cached_batch_simulator
 

@@ -8,7 +8,7 @@ Every model module in this package is just the math:
 * ``propensities_fn(params) -> (state, u) -> Array[M]`` closure factory.
 * ``apply_reaction = make_apply_reaction(_STOICH)``.
 
-The one-call entry point is :func:`simulate_dataset` in this module; it
+The one-call entry point is :func:`sample_trajectories` in this module; it
 takes a model module plus caller-supplied ``x0`` and returns a
 :class:`Dataset`. Default timescale is ``n_steps=1000, dt=0.1`` for every
 model; the caller picks something appropriate per system.
@@ -41,7 +41,7 @@ class State(NamedTuple):
     """State carried through the Gillespie SSA loop.
 
     ``x`` is always a 1-D ``(n_species,)`` JAX array, even for single-species
-    models — this keeps :func:`simulate_dataset` uniform across the library.
+    models — this keeps :func:`sample_trajectories` uniform across the library.
     """
 
     time: jax.Array
@@ -53,7 +53,7 @@ class State(NamedTuple):
 
 
 class Dataset(NamedTuple):
-    """Output of every model's :func:`simulate_dataset`.
+    """Output of every model's :func:`sample_trajectories`.
 
     All arrays are NumPy (host-side) because downstream usage is
     bin/analyse, not further JAX work. The per-species trajectory tensor
@@ -161,7 +161,7 @@ def make_apply_reaction(stoichiometry: tuple[tuple[int, ...], ...]) -> Callable[
 
 
 class ModelModule(Protocol):
-    """Structural contract for a model module passed to :func:`simulate_dataset`.
+    """Structural contract for a model module passed to :func:`sample_trajectories`.
 
     Every module in :data:`crn_jax.models.ALL_MODELS` satisfies this Protocol;
     custom user-defined models can too, without subclassing anything.
@@ -210,7 +210,7 @@ def _cached_batch_simulator(
     Cache key is ``(propensities_factory, apply_reaction_fn, params,
     n_steps)``. The factory and apply-reaction are functions (hashable by
     identity); ``params`` is a frozen dataclass (hashable by value). This
-    means repeated ``simulate_dataset`` calls with the same model and
+    means repeated ``sample_trajectories`` calls with the same model and
     same params reuse the compiled XLA artifact.
 
     ``maxsize=128`` caps memory growth in long-running sessions that sweep
@@ -220,7 +220,7 @@ def _cached_batch_simulator(
     return make_vmap_simulator(n_steps, propensities_factory(params), apply_reaction_fn)
 
 
-def simulate_dataset(
+def sample_trajectories(
     model: ModelModule,
     key: PRNGKey,
     x0: jax.Array,

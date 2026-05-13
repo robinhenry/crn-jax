@@ -120,7 +120,7 @@ key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
 x0 = jax.random.uniform(k_x0, (n_rep, len(models.repressilator.SPECIES)),
                         minval=0.0, maxval=100.0)
 
-ds = models.simulate_dataset(models.repressilator, key, x0, n_steps=2000, dt=0.1)
+ds = models.sample_trajectories(models.repressilator, key, x0, n_steps=2000, dt=0.1)
 
 # Every Dataset has the same shape.
 ds.species    # ("A", "B", "C")
@@ -128,7 +128,7 @@ ds.xs         # (n_replicates, n_steps, n_species) — full trajectories
 ds.X_t, ds.dX # (n_replicates * n_steps, n_species) — flat one-step transitions
 
 # Switch regime by passing different Params.
-ds_hard = models.simulate_dataset(
+ds_hard = models.sample_trajectories(
     models.repressilator, key, x0, params=models.repressilator.Params.hard(),
     n_steps=2000, dt=0.1,
 )

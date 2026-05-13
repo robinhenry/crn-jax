@@ -2,7 +2,7 @@
 
 ``crn_jax.models`` ships a library of canonical reaction networks (see
 ``src/crn_jax/models/library.json``). Run any of them through the
-package-level ``simulate_dataset(model, key, x0, ...)`` entry point.
+package-level ``sample_trajectories(model, key, x0, ...)`` entry point.
 
 This example plots two visually distinct models side by side: the
 Elowitz-Leibler repressilator (sustained oscillation under negative
@@ -25,7 +25,7 @@ def main() -> None:
     # Repressilator: easy regime → sustained oscillation (n=2, β₁=29.97).
     # ICs span 0–100 across the three nodes so initial phase is varied.
     x0_rep = jax.random.uniform(k_rep_x0, (3, 3), minval=0.0, maxval=100.0)
-    ds_rep = models.simulate_dataset(
+    ds_rep = models.sample_trajectories(
         models.repressilator,
         k_rep,
         x0_rep,
@@ -37,7 +37,7 @@ def main() -> None:
     # Toggle switch: BIOMD0000000507 params. Broad IC sampling so some
     # replicates land in the A-high basin and others in the B-high basin.
     x0_tog = jax.random.uniform(k_tog_x0, (8, 2), minval=0.0, maxval=200.0)
-    ds_tog = models.simulate_dataset(
+    ds_tog = models.sample_trajectories(
         models.toggle,
         k_tog,
         x0_tog,

@@ -15,7 +15,7 @@ Each submodule owns one model and exports the same five names:
 
 The one-call entry point lives at the package level, not on each module:
 
-* :func:`simulate_dataset(model, key, x0, …) <simulate_dataset>` — run a
+* :func:`sample_trajectories(model, key, x0, …) <sample_trajectories>` — run a
   batch Gillespie simulation of ``model`` on caller-supplied ``x0`` of
   shape ``(n_replicates, n_species)`` and return a :class:`Dataset`. The
   underlying JIT'd vmap'd batch simulator is cached on
@@ -37,7 +37,7 @@ Quickstart
     x0 = jax.random.uniform(k_x0, (n_rep, len(models.repressilator.SPECIES)),
                             minval=0.0, maxval=100.0)
 
-    ds = models.simulate_dataset(models.repressilator, key, x0, n_steps=2000, dt=0.1)
+    ds = models.sample_trajectories(models.repressilator, key, x0, n_steps=2000, dt=0.1)
     ds.xs.shape       # (32, 2000, 3)
     ds.species        # ("A", "B", "C")
     ds.X_t, ds.dX     # (32 * 2000, 3) flat transitions
@@ -76,7 +76,7 @@ from . import (
     toggle,
     two_stage,
 )
-from ._common import Dataset, State, simulate_dataset  # noqa: F401 — re-exported via __all__
+from ._common import Dataset, State, sample_trajectories  # noqa: F401 — re-exported via __all__
 
 # Convenience: an ordered tuple of every model module in the library.
 # Useful for iterating ("for m in ALL_MODELS: ...") and for parameter
@@ -103,7 +103,7 @@ __all__ = sorted(
         "ALL_MODELS",
         "Dataset",
         "State",
-        "simulate_dataset",
+        "sample_trajectories",
         *(m.__name__.rsplit(".", 1)[-1] for m in ALL_MODELS),
     ]
 )
