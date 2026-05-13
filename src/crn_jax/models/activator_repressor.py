@@ -16,7 +16,7 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 
-from ..kinetics import hill_function
+from ..kinetics import hill_function, repressive_hill
 from ._common import (
     State,
     make_apply_reaction,
@@ -57,7 +57,7 @@ def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
     def f(state: State, _u: Array) -> Array:
         A = state.x[0]
         B = state.x[1]
-        repress_a_by_b = 1.0 - hill_function(B, params.K_B, params.n_B)
+        repress_a_by_b = repressive_hill(B, params.K_B, params.n_B)
         activate_b_by_a = hill_function(A, params.K_A, params.n_A)
         return jnp.array(
             [

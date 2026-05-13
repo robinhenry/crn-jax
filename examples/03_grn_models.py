@@ -1,12 +1,8 @@
 """Example 03 — using the standard GRN models library.
 
 ``crn_jax.models`` ships a library of canonical reaction networks (see
-``src/crn_jax/models/library.json``). Each model exports the same surface
-(``SPECIES``, ``Params`` with ``.easy()`` / ``.hard()`` factories,
-``propensities_fn``, ``apply_reaction``); the one-call entry point is
-``crn_jax.models.simulate_dataset(model, key, x0, ...)``. The caller
-supplies ``x0`` — the library deliberately does not sample initial
-conditions for you, because the sensible IC is problem-specific.
+``src/crn_jax/models/library.json``). Run any of them through the
+package-level ``simulate_dataset(model, key, x0, ...)`` entry point.
 
 This example plots two visually distinct models side by side: the
 Elowitz-Leibler repressilator (sustained oscillation under negative
@@ -17,7 +13,6 @@ inhibition giving rise to two stable basins).
 from pathlib import Path
 
 import jax
-import jax.random as jr
 import matplotlib.pyplot as plt
 
 from crn_jax import models
@@ -25,11 +20,11 @@ from crn_jax import models
 
 def main() -> None:
     key = jax.random.PRNGKey(0)
-    k_rep, k_rep_x0, k_tog, k_tog_x0 = jr.split(key, 4)
+    k_rep, k_rep_x0, k_tog, k_tog_x0 = jax.random.split(key, 4)
 
     # Repressilator: easy regime → sustained oscillation (n=2, β₁=29.97).
     # ICs span 0–100 across the three nodes so initial phase is varied.
-    x0_rep = jr.uniform(k_rep_x0, (3, 3), minval=0.0, maxval=100.0)
+    x0_rep = jax.random.uniform(k_rep_x0, (3, 3), minval=0.0, maxval=100.0)
     ds_rep = models.simulate_dataset(
         models.repressilator,
         k_rep,
@@ -41,7 +36,7 @@ def main() -> None:
 
     # Toggle switch: BIOMD0000000507 params. Broad IC sampling so some
     # replicates land in the A-high basin and others in the B-high basin.
-    x0_tog = jr.uniform(k_tog_x0, (8, 2), minval=0.0, maxval=200.0)
+    x0_tog = jax.random.uniform(k_tog_x0, (8, 2), minval=0.0, maxval=200.0)
     ds_tog = models.simulate_dataset(
         models.toggle,
         k_tog,

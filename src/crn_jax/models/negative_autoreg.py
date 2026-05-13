@@ -17,7 +17,7 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 
-from ..kinetics import hill_function
+from ..kinetics import repressive_hill
 from ._common import (
     State,
     make_apply_reaction,
@@ -50,7 +50,7 @@ class Params:
 def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
     def f(state: State, _u: Array) -> Array:
         X = state.x[0]
-        repression = 1.0 - hill_function(X, params.K, params.n)
+        repression = repressive_hill(X, params.K, params.n)
         return jnp.array(
             [
                 params.beta_0 + params.beta_1 * repression,

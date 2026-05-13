@@ -7,8 +7,6 @@ Reactions
 ---------
     R0:  ∅ → X     at rate  β₀ + β₁ · Xⁿ / (Kⁿ + Xⁿ)        ν = (+1,)
     R1:  X → ∅     at rate  δ · X                            ν = (-1,)
-
-Initial conditions sampled wide enough to populate both basins.
 """
 
 import dataclasses
