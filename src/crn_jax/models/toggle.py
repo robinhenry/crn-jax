@@ -55,32 +55,18 @@ class Params:
 
     @classmethod
     def easy(cls) -> "Params":
-        return cls(
-            beta_A0=15.6,
-            beta_A1=156.25,
-            beta_B0=0.0,
-            beta_B1=15.6,
-            K_A=2.0015,
-            K_B=2.9618e-05,
-            n_A=1.0,
-            n_B=2.5,
-            delta_A=1.0,
-            delta_B=1.0,
-        )
+        return cls()
 
     @classmethod
     def hard(cls) -> "Params":
         return cls(
             beta_A0=10.0,
             beta_A1=100.0,
-            beta_B0=0.0,
             beta_B1=10.0,
             K_A=1.5,
             K_B=0.01,
             n_A=2.0,
             n_B=2.0,
-            delta_A=1.0,
-            delta_B=1.0,
         )
 
 

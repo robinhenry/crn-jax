@@ -17,11 +17,11 @@ shape (:class:`Dataset`), the JIT+vmap batch-simulator factory
 function :func:`run_dataset` that the per-model ``simulate_dataset``
 wrappers call into.
 
-All 14 models in this library are autonomous (no exogenous input). The
-underlying Gillespie driver still threads a per-replicate scalar ``u``
-through its API, so each model's ``propensities_fn`` accepts ``(state, u)``
-and simply ignores ``u``; :func:`run_dataset` materialises a zeros input
-internally.
+All 14 models in this library are autonomous: their ``propensities_fn``
+takes ``(state, u)`` only because the Gillespie driver's signature requires
+it, and the ``u`` argument is ignored. :func:`make_vmap_simulator` calls
+:func:`simulate_trajectory` with ``inputs=None`` so the driver skips the
+input-change invalidation it would otherwise perform.
 """
 
 from typing import Callable, NamedTuple, Protocol
@@ -78,10 +78,9 @@ class Dataset(NamedTuple):
 class BatchSimulator(Protocol):
     """The function returned by :func:`make_vmap_simulator`.
 
-    Given per-replicate keys, initial ``state.x`` values (shape
-    ``(n_replicates, n_species)``), a shared timestep, and per-replicate
-    scalar inputs, returns a stacked :class:`State` PyTree with a leading
-    replicate axis.
+    Given per-replicate keys and initial ``state.x`` values (shape
+    ``(n_replicates, n_species)``) plus a shared timestep, returns a
+    stacked :class:`State` PyTree with a leading replicate axis.
     """
 
     def __call__(
@@ -89,7 +88,6 @@ class BatchSimulator(Protocol):
         keys: jax.Array,
         x0_batch: jax.Array,
         dt: float | jax.Array,
-        u_batch: jax.Array,
     ) -> State: ...
 
 
@@ -113,19 +111,18 @@ def make_vmap_simulator(
 
     Returns:
         A :class:`BatchSimulator` that vmaps the per-trajectory simulation
-        over ``keys``, ``x0_batch`` (per-replicate initial ``state.x``), and
-        ``u_batch`` (per-replicate scalar input, held constant across the
-        trajectory). For input-free models pass ``jnp.zeros((n_replicates,))``;
-        :func:`run_dataset` already does this.
+        over ``keys`` and ``x0_batch``. ``inputs=None`` is forwarded to
+        :func:`simulate_trajectory` so the driver skips per-step
+        input-change invalidation (all models in this library are
+        autonomous).
     """
 
-    def simulate_one(key, x0, dt, u_scalar):
+    def simulate_one(key, x0, dt):
         state0 = State(
             time=jnp.array(0.0),
             x=x0,
             next_reaction_time=jnp.array(jnp.inf),
         )
-        inputs = jnp.full((n_steps,), u_scalar)
         return simulate_trajectory(
             key=key,
             initial_state=state0,
@@ -133,12 +130,12 @@ def make_vmap_simulator(
             n_steps=n_steps,
             compute_propensities_fn=propensities_fn,
             apply_reaction_fn=apply_reaction_fn,
-            inputs=inputs,
+            inputs=None,
         )
 
     @jax.jit
-    def run(keys, x0_batch, dt, u_batch):
-        return jax.vmap(simulate_one, in_axes=(0, 0, None, 0))(keys, x0_batch, dt, u_batch)
+    def run(keys, x0_batch, dt):
+        return jax.vmap(simulate_one, in_axes=(0, 0, None))(keys, x0_batch, dt)
 
     return run
 
@@ -219,8 +216,7 @@ def flatten_species(x0: np.ndarray, xs: np.ndarray) -> tuple[np.ndarray, np.ndar
         ``dX[k] = X_t[k+1] - X_t[k]`` (or ``xs[..., 0] - x0`` for the very
         first triple of each replicate).
     """
-    # Prepend x0 to get a length (n_steps + 1) sequence per replicate.
-    x_full = np.concatenate([x0[:, None, :], xs], axis=1)  # (n_rep, n_steps+1, n_species)
+    x_full = np.concatenate([x0[:, None, :], xs], axis=1)
     n_species = x_full.shape[-1]
     X_t = x_full[:, :-1, :].reshape(-1, n_species).astype(np.float32)
     X_next = x_full[:, 1:, :].reshape(-1, n_species).astype(np.float32)
@@ -244,10 +240,6 @@ def run_dataset(
     helper: they choose model-specific defaults for ``n_replicates``,
     ``n_steps``, ``dt``, and the ``x0_dists`` tuple (one DistSpec per
     species), then forward everything here.
-
-    Internally pads with a zero per-replicate input because every model in
-    this library is autonomous; the propensity closures accept the ``u``
-    argument but ignore it.
     """
     if len(x0_dists) != len(species):
         raise ValueError(
@@ -258,18 +250,13 @@ def run_dataset(
     n_species = len(species)
     key_sim, *key_x0 = jax.random.split(key, n_species + 1)
 
-    # Sample each species' IC independently, then stack into (n_rep, n_species).
     x0_cols = [sample_initial_state(k, (n_replicates,), dist) for k, dist in zip(key_x0, x0_dists, strict=True)]
     x0 = jnp.stack(x0_cols, axis=-1)
 
     keys = jax.random.split(key_sim, n_replicates)
-    u_zeros = jnp.zeros((n_replicates,))
-    states = simulator(keys, x0, dt, u_zeros)
+    states = simulator(keys, x0, dt)
 
-    # Normalise to (n_rep, n_steps, n_species) on the host side.
     xs = np.asarray(states.x)
-    if xs.ndim == 2:  # defensive: single-species models that elided the species axis
-        xs = xs[..., None]
     x0_np = np.asarray(x0)
     X_t, dX = flatten_species(x0_np, xs)
 

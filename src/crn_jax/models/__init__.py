@@ -67,7 +67,7 @@ from . import (
     toggle,
     two_stage,
 )
-from ._common import Dataset, State
+from ._common import Dataset, State  # noqa: F401 — re-exported via __all__
 
 # Convenience: an ordered tuple of every model module in the library.
 # Useful for iterating ("for m in ALL_MODELS: ...") and for parameter
@@ -89,22 +89,4 @@ ALL_MODELS = (
     cyclic_ring,
 )
 
-__all__ = [
-    "ALL_MODELS",
-    "Dataset",
-    "State",
-    "activator_repressor",
-    "birth_death",
-    "bistable",
-    "coherent_ffl",
-    "cyclic_ring",
-    "incoherent_ffl",
-    "linear_chain",
-    "mutual_activation",
-    "negative_autoreg",
-    "positive_autoreg",
-    "repressilator",
-    "telegraph",
-    "toggle",
-    "two_stage",
-]
+__all__ = sorted(["ALL_MODELS", "Dataset", "State", *(m.__name__.rsplit(".", 1)[-1] for m in ALL_MODELS)])

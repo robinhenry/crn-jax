@@ -54,17 +54,20 @@ def _representative_state(module) -> models.State:
     propensity terms, small enough that overflow isn't a concern.
     """
     n_species = len(module.SPECIES)
-    return module.State(
+    return models.State(
         time=jnp.array(0.0),
         x=jnp.ones((n_species,)),
         next_reaction_time=jnp.array(jnp.inf),
     )
 
 
+parametrize_models = pytest.mark.parametrize("module", models.ALL_MODELS, ids=lambda m: m.__name__.rsplit(".", 1)[-1])
+
+
 # --- Per-model smoke tests --------------------------------------------------
 
 
-@pytest.mark.parametrize("module", models.ALL_MODELS, ids=lambda m: m.__name__.rsplit(".", 1)[-1])
+@parametrize_models
 def test_propensities_finite_and_nonneg(module):
     p = module.Params()
     state = _representative_state(module)
@@ -74,7 +77,7 @@ def test_propensities_finite_and_nonneg(module):
     assert jnp.all(a >= 0), f"propensities must be non-negative: {a}"
 
 
-@pytest.mark.parametrize("module", models.ALL_MODELS, ids=lambda m: m.__name__.rsplit(".", 1)[-1])
+@parametrize_models
 def test_simulate_dataset_shapes(module):
     n_rep, n_steps = 8, 50
     ds = module.simulate_dataset(jax.random.PRNGKey(0), n_replicates=n_rep, n_steps=n_steps)
@@ -89,7 +92,7 @@ def test_simulate_dataset_shapes(module):
     assert ds.dX.dtype == np.float32
 
 
-@pytest.mark.parametrize("module", models.ALL_MODELS, ids=lambda m: m.__name__.rsplit(".", 1)[-1])
+@parametrize_models
 def test_easy_and_hard_params_differ(module):
     """Every model in the library has distinct easy / hard regimes."""
     assert module.Params.easy() != module.Params.hard()

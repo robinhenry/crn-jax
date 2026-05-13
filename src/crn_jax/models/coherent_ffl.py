@@ -50,11 +50,11 @@ class Params:
 
     @classmethod
     def easy(cls) -> "Params":
-        return cls(a=1.0, Ty=0.5, Tz=0.5)
+        return cls()
 
     @classmethod
     def hard(cls) -> "Params":
-        return cls(a=1.0, Ty=0.7, Tz=0.3)
+        return cls(Ty=0.7, Tz=0.3)
 
 
 def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
