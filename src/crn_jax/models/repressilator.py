@@ -1,4 +1,4 @@
-"""Repressilator — Elowitz-Leibler synthetic oscillator.
+"""Repressilator: Elowitz-Leibler synthetic oscillator.
 
 State: three species ``[A, B, C]`` forming a single repressive ring:
 C ⊣ A ⊣ B ⊣ C. With sufficient cooperativity and a sharp enough Hill
@@ -13,14 +13,58 @@ Reactions
     R4:  ∅ → C     at rate  β_C0 + β_C1 · K_Bⁿ / (K_Bⁿ + Bⁿ)     ν = ( 0,  0, +1)
     R5:  C → ∅     at rate  δ_C · C                                ν = ( 0,  0, -1)
 
-A single shared Hill exponent ``n`` is used for all three nodes (matches
-the BioModels source). Defaults give δ ≈ 0.347 (lifetime ≈ 3 min) and
-β₁ chosen so the deterministic system limit-cycles.
+A single shared Hill exponent ``n`` is used for all three nodes.
+
+Default parameters
+------------------
+Adiabatic reduction of the Elowitz & Leibler (2000) 6-species
+(mRNA + protein) model with fitted parameters from their E. coli synthetic
+repressilator construct, rescaled into a 3-species Hill form. mRNA
+dynamics are ignored in this implementation.
+
+    β_A1 = β_B1 = β_C1 = α · K · δ  ≈  600  (max protein production /min)
+    β_A0 = β_B0 = β_C0 = 0.1% · β_1 ≈  0.6  (basal leak, Elowitz's α₀/α = 10⁻³)
+    K_A  = K_B  = K_C  = 40                 (Elowitz K_M = 40 monomers/cell)
+    n                  = 3                  (Hill cooperativity; see note)
+    δ_A  = δ_B  = δ_C  = ln(2)/10 ≈ 0.0693  (10-min protein half-life — LVA tag)
+
+Dimensionless `α = β₁ / (δ · K) ≈ 216` — well above the Hopf
+bifurcation threshold for n=3 (α_crit ≈ 3.78), giving robust limit
+cycles. Predicted oscillation period of order ~150 min (matches
+Elowitz's experimental observation in E. coli).
+
+Note on Hill coefficient
+-------------------------
+Elowitz's experimental fit gives n ≈ 2 (single TF dimer binding).
+However, the 3-species Hill-form reduced model with n = 2 does *not*
+oscillate at any α, the Hopf bifurcation requires n > 2 (Goodwin-style
+analysis for the symmetric 3-cycle). The original 6-species Elowitz
+model does oscillate at n = 2 because the mRNA-protein two-stage
+dynamics add an extra time delay that lowers the bifurcation threshold,
+but that delay is lost in the adiabatic reduction. Bumping to n = 3 is
+fixes it and remains biologically defensible: real TF binding to
+promoters with multiple cooperative operator sites (e.g., λ-cI binding
+OR1+OR2) gives an effective Hill exponent ≈ 2.5–3.
+
+Note on timescale and copy numbers
+----------------------------------
+The 10-min protein half-life is deliberately *faster* than this
+library's default 30-min convention. Elowitz used LVA degradation tags
+specifically to accelerate protein turnover. Without this, dilution-
+limited proteins (~30-min half-life) would have cycles too slow for
+clean oscillation. The 10-min value is consistent with the
+specific synthetic construct.
+
+⟨A⟩_max ≈ β_A1 / δ_A ≈ 8650 monomers is high relative to typical TF
+copy numbers, but representative of the strong pL promoter expression
+Elowitz observed in this actual E. coli circuit.
 
 Sources
 -------
-* https://www.ebi.ac.uk/biomodels/BIOMD0000000012
-* https://github.com/biomodels/BIOMD0000000012/blob/master/README.md
+* Elowitz MB, Leibler S (2000). A synthetic oscillatory network of
+  transcriptional regulators. Nature 403:335–338 — original landmark;
+  parameters above are taken from their Methods (adiabatically reduced),
+  with n bumped from 2 to 3 to preserve oscillation in the reduced model.
 """
 
 import dataclasses
@@ -36,19 +80,19 @@ from ._common import make_apply_reaction
 
 @dataclasses.dataclass(frozen=True)
 class Params:
-    beta_A0: float = 0.03
-    beta_A1: float = 29.97
-    beta_B0: float = 0.03
-    beta_B1: float = 29.97
-    beta_C0: float = 0.03
-    beta_C1: float = 29.97
+    beta_A0: float = 0.6
+    beta_A1: float = 600.0
+    beta_B0: float = 0.6
+    beta_B1: float = 600.0
+    beta_C0: float = 0.6
+    beta_C1: float = 600.0
     K_A: float = 40.0
     K_B: float = 40.0
     K_C: float = 40.0
-    n: float = 2.0
-    delta_A: float = 0.347
-    delta_B: float = 0.347
-    delta_C: float = 0.347
+    n: float = 3.0
+    delta_A: float = 0.0693
+    delta_B: float = 0.0693
+    delta_C: float = 0.0693
 
     @classmethod
     def default(cls) -> Self:
