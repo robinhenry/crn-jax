@@ -141,7 +141,7 @@ The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulat
 | `birth_death`          | X         | 2         | minimal one-species baseline                |
 | `single_gene`          | R, P      | 4         | constitutive transcription-translation      |
 | `negative_autoregulation` | X      | 2         | Hill-repressed self-feedback                |
-| `positive_autoreg`     | X         | 2         | Hill self-activation                        |
+| `positive_autoregulation`     | X         | 2         | Hill self-activation                        |
 | `bistable`             | X         | 2         | self-activation in the bistable regime      |
 | `linear_chain`         | A, B      | 4         | A → B causal chain                          |
 | `toggle`               | A, B      | 4         | mutual inhibition (BIOMD0000000507)         |

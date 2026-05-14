@@ -1,4 +1,4 @@
-"""Bistable self-activation — same reactions as :mod:`positive_autoreg`,
+"""Bistable self-activation — same reactions as :mod:`positive_autoregulation`,
 parameterised in the bistable regime (sharper Hill, lower leakage).
 
 State: one species ``X``.
