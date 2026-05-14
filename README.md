@@ -142,7 +142,7 @@ The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulat
 | `single_gene`          | R, P      | 4         | constitutive transcription-translation      |
 | `negative_autoregulation` | X      | 2         | Hill-repressed self-feedback                |
 | `positive_autoregulation` | X      | 2         | Hill self-activation (graded; `Params.bistable()` for the bistable regime) |
-| `linear_chain`         | A, B      | 4         | A → B causal chain                          |
+| `linear_cascade`       | A, B      | 4         | A → B activation cascade                    |
 | `toggle`               | A, B      | 4         | mutual inhibition (BIOMD0000000507)         |
 | `activator_repressor`  | A, B      | 4         | A → B, B ⊣ A mixed-sign loop                |
 | `mutual_activation`    | A, B      | 4         | A ↔ B positive mutual feedback              |
