@@ -74,6 +74,7 @@ def plot_trajectories(
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    ax.set_ylim(bottom=0)  # species counts are non-negative
     if title is not None:
         ax.set_title(title)
     return fig, ax
@@ -87,7 +88,7 @@ def plot_species_trajectories(
     colors: Sequence[str] | None = None,
     alpha: float | None = None,
     figsize: tuple[float, float] | None = None,
-) -> "tuple[Figure, np.ndarray]":
+) -> tuple[Figure, np.ndarray]:
     """Plot a multi-species ensemble as one step-plot subplot per species.
 
     Each subplot shows every replicate's trajectory for a single species,

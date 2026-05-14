@@ -7,7 +7,6 @@ factory classmethods), ``propensities_fn``, and ``apply_reaction``.
 from . import (
     activator_repressor,
     birth_death,
-    bistable,
     coherent_ffl,
     cyclic_ring,
     incoherent_ffl,
@@ -26,7 +25,6 @@ ALL_MODELS = (
     single_gene,
     negative_autoregulation,
     positive_autoregulation,
-    bistable,
     linear_chain,
     toggle,
     activator_repressor,
