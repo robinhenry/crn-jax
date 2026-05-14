@@ -146,6 +146,7 @@ The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulat
 | `toggle_switch`        | A, B      | 4         | mutual repression (Lugagne 2017 *E. coli*)  |
 | `incoherent_ffl`       | A, B, C   | 6         | adaptive / pulse-generating FFL             |
 | `repressilator`        | A, B, C   | 6         | synthetic oscillator (Elowitz & Leibler 2000) |
+| `cca_optogenetic`      | R, P      | 4         | light-driven gene expression (CcaS/CcaR, Tabor lab) — **input-driven** |
 
 ## API
 

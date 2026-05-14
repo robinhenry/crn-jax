@@ -6,6 +6,7 @@ factory classmethods), ``propensities_fn``, and ``apply_reaction``.
 
 from . import (
     birth_death,
+    cca_optogenetic,
     incoherent_ffl,
     linear_cascade,
     negative_autoregulation,
@@ -25,6 +26,7 @@ ALL_MODELS = (
     toggle_switch,
     incoherent_ffl,
     repressilator,
+    cca_optogenetic,
 )
 
 __all__ = sorted(
