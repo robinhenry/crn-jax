@@ -8,6 +8,10 @@ Reactions
     R1:  X → ∅     at rate  δ · X            ν = (-1,)
 
 Stationary distribution is Poisson with mean ``⟨X⟩ = α / δ``.
+
+Sources
+-------
+* https://www.sciencedirect.com/science/article/pii/S0092867408012439
 """
 
 import dataclasses

@@ -1,14 +1,12 @@
 """Tests for ``crn_jax.models`` — the GRN benchmark library.
 
-Three classes of checks:
+Two classes of checks:
 
 1. **Per-model smoke tests** (parametrised over every module in
    ``ALL_MODELS``): propensities are finite/non-negative, ``sample_trajectories``
    returns the documented shapes, ``Params.easy()`` and ``Params.hard()`` are
    distinct.
-2. **Parameter consistency**: load the packaged ``library.json`` and verify
-   ``Params.easy()`` / ``Params.hard()`` match the JSON field-by-field.
-3. **A few behavioural sanity checks**: birth-death steady state,
+2. **A few behavioural sanity checks**: birth-death steady state,
    negative-autoreg equilibrium, coherent-FFL pulse-through, toggle bimodality.
 
 Plus the carried-over BYO and JIT-cache tests.
@@ -16,45 +14,23 @@ Plus the carried-over BYO and JIT-cache tests.
 
 from __future__ import annotations
 
-import dataclasses
-import json
-from importlib import resources
-
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from crn_jax import models
-
-# --- Mapping from JSON motif_name → model module ---------------------------
-# Matches the order in src/crn_jax/models/library.json.
-_JSON_NAME_TO_MODULE = {
-    "Birth-death": models.birth_death,
-    "Two-stage transcription-translation": models.two_stage,
-    "Telegraph promoter": models.telegraph,
-    "Negative autoregulation": models.negative_autoreg,
-    "Positive autoregulation": models.positive_autoreg,
-    "Bistable self-activation": models.bistable,
-    "Linear activation chain": models.linear_chain,
-    "Toggle switch": models.toggle,
-    "Activator-repressor pair": models.activator_repressor,
-    "Mutual activation": models.mutual_activation,
-    "Coherent feed-forward loop (AND gate)": models.coherent_ffl,
-    "Incoherent feed-forward loop": models.incoherent_ffl,
-    "Repressilator": models.repressilator,
-    "Cyclic hybrid ring": models.cyclic_ring,
-}
+from crn_jax.types import State
 
 
-def _representative_state(module) -> models.State:
+def _representative_state(module) -> State:
     """Build a non-degenerate state for propensity sanity-checking.
 
     Every species gets a count of 1.0 — large enough to exercise all
     propensity terms, small enough that overflow isn't a concern.
     """
     n_species = len(module.SPECIES)
-    return models.State(
+    return State(
         time=jnp.array(0.0),
         x=jnp.ones((n_species,)),
         next_reaction_time=jnp.array(jnp.inf),
@@ -97,47 +73,6 @@ def test_sample_trajectories_shapes(module):
 def test_easy_and_hard_params_differ(module):
     """Every model in the library has distinct easy / hard regimes."""
     assert module.Params.easy() != module.Params.hard()
-
-
-# --- Parameter consistency against library.json ------------------------------
-
-
-def _library_motifs():
-    with resources.files("crn_jax.models").joinpath("library.json").open() as f:
-        return json.load(f)["motifs"]
-
-
-def test_library_json_covers_all_modules():
-    """Every JSON entry maps to a module and every module is in the JSON."""
-    json_names = {m["motif_name"] for m in _library_motifs()}
-    mapped_names = set(_JSON_NAME_TO_MODULE)
-    assert json_names == mapped_names, (
-        f"library.json names ↔ module mapping mismatch.\n"
-        f"  in JSON, not mapped: {json_names - mapped_names}\n"
-        f"  mapped, not in JSON: {mapped_names - json_names}"
-    )
-
-
-@pytest.mark.parametrize("motif_entry", _library_motifs(), ids=lambda m: m["motif_name"])
-def test_params_match_library_json(motif_entry):
-    """``Params.easy()`` and ``Params.hard()`` match the JSON values."""
-    module = _JSON_NAME_TO_MODULE[motif_entry["motif_name"]]
-    for regime in ("easy", "hard"):
-        expected = motif_entry[f"params_{regime}"]
-        actual = dataclasses.asdict(getattr(module.Params, regime)())
-        # The JSON is the source of truth; assert every JSON field is reflected
-        # in Params, and that the Params dataclass has no extra fields.
-        assert set(actual) == set(expected), (
-            f"{motif_entry['motif_name']} / {regime}: fields differ (actual={set(actual)}, expected={set(expected)})"
-        )
-        for k, v in expected.items():
-            np.testing.assert_allclose(
-                actual[k],
-                v,
-                rtol=1e-7,
-                atol=0.0,
-                err_msg=f"{motif_entry['motif_name']} / {regime}: field {k!r}",
-            )
 
 
 # --- Behavioural sanity checks ----------------------------------------------

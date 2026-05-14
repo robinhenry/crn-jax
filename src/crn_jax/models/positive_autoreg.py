@@ -4,31 +4,28 @@ State: one species ``X``.
 
 Reactions
 ---------
-    R0:  ∅ → X     at rate  β₀ + β₁ · Xⁿ / (Kⁿ + Xⁿ)        ν = (+1,)
-    R1:  X → ∅     at rate  δ · X                            ν = (-1,)
+    R0:  ∅ → X     at rate  β₀ + β₁ · Xⁿ / (Kⁿ + Xⁿ)   ν = (+1,)
+    R1:  X → ∅     at rate  δ · X                      ν = (-1,)
 
 For sub-cooperative Hill (``n ≤ 1``) the equilibrium is monostable and
 graded; cooperativity ``n ≥ 2`` plus low leakage gives switch-like
 behaviour — see :mod:`~crn_jax.models.bistable` for the bistable regime.
+
+Sources
+-------
+* https://mcb111.org/w11/w11-lecture.html
+* https://www.cs.helsinki.fi/u/lmsalmel/cmsb09/lectures/CompMSysBio2009-Lecture5.pdf
 """
 
 import dataclasses
-from typing import Callable
+from typing import Self
 
 import jax.numpy as jnp
 from jax import Array
 
 from ..kinetics import hill_function
-from ._common import (
-    State,
-    make_apply_reaction,
-)
-
-SPECIES: tuple[str, ...] = ("X",)
-_STOICH: tuple[tuple[int, ...], ...] = (
-    (+1,),
-    (-1,),
-)
+from ..types import PropensitiesFn, SpeciesNames, State, StoichiometryMatrix
+from ._common import make_apply_reaction
 
 
 @dataclasses.dataclass(frozen=True)
@@ -40,26 +37,31 @@ class Params:
     delta: float = 1.0
 
     @classmethod
-    def easy(cls) -> "Params":
+    def easy(cls) -> Self:
         return cls()
 
     @classmethod
-    def hard(cls) -> "Params":
+    def hard(cls) -> Self:
         return cls(beta_1=8.0, n=2.0)
 
 
-def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
+SPECIES: SpeciesNames = ("X",)
+_STOICHIOMETRY: StoichiometryMatrix = (
+    (+1,),  # R0: ∅ → X
+    (-1,),  # R1: X → ∅
+)
+apply_reaction = make_apply_reaction(_STOICHIOMETRY)
+
+
+def propensities_fn(params: Params) -> PropensitiesFn:
     def f(state: State, _u: Array) -> Array:
         X = state.x[0]
         activation = hill_function(X, params.K, params.n)
         return jnp.array(
             [
-                params.beta_0 + params.beta_1 * activation,
-                params.delta * X,
+                params.beta_0 + params.beta_1 * activation,  # R0
+                params.delta * X,  # R1
             ]
         )
 
     return f
-
-
-apply_reaction = make_apply_reaction(_STOICH)

@@ -1,4 +1,4 @@
-"""Repressilator — Elowitz-Leibler synthetic oscillator (BIOMD0000000012).
+"""Repressilator — Elowitz-Leibler synthetic oscillator.
 
 State: three species ``[A, B, C]`` forming a single repressive ring:
 C ⊣ A ⊣ B ⊣ C. With sufficient cooperativity and a sharp enough Hill
@@ -16,29 +16,22 @@ Reactions
 A single shared Hill exponent ``n`` is used for all three nodes (matches
 the BioModels source). Defaults give δ ≈ 0.347 (lifetime ≈ 3 min) and
 β₁ chosen so the deterministic system limit-cycles.
+
+Sources
+-------
+* https://www.ebi.ac.uk/biomodels/BIOMD0000000012
+* https://github.com/biomodels/BIOMD0000000012/blob/master/README.md
 """
 
 import dataclasses
-from typing import Callable
+from typing import Self
 
 import jax.numpy as jnp
 from jax import Array
 
 from ..kinetics import repressive_hill
-from ._common import (
-    State,
-    make_apply_reaction,
-)
-
-SPECIES: tuple[str, ...] = ("A", "B", "C")
-_STOICH: tuple[tuple[int, ...], ...] = (
-    (+1, 0, 0),
-    (-1, 0, 0),
-    (0, +1, 0),
-    (0, -1, 0),
-    (0, 0, +1),
-    (0, 0, -1),
-)
+from ..types import PropensitiesFn, SpeciesNames, State, StoichiometryMatrix
+from ._common import make_apply_reaction
 
 
 @dataclasses.dataclass(frozen=True)
@@ -58,15 +51,27 @@ class Params:
     delta_C: float = 0.347
 
     @classmethod
-    def easy(cls) -> "Params":
+    def easy(cls) -> Self:
         return cls()
 
     @classmethod
-    def hard(cls) -> "Params":
+    def hard(cls) -> Self:
         return cls(beta_A1=20.0, beta_B1=20.0, beta_C1=20.0, n=1.5)
 
 
-def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
+SPECIES: SpeciesNames = ("A", "B", "C")
+_STOICHIOMETRY: StoichiometryMatrix = (
+    (+1, 0, 0),  # R0: ∅ → A
+    (-1, 0, 0),  # R1: A → ∅
+    (0, +1, 0),  # R2: ∅ → B
+    (0, -1, 0),  # R3: B → ∅
+    (0, 0, +1),  # R4: ∅ → C
+    (0, 0, -1),  # R5: C → ∅
+)
+apply_reaction = make_apply_reaction(_STOICHIOMETRY)
+
+
+def propensities_fn(params: Params) -> PropensitiesFn:
     def f(state: State, _u: Array) -> Array:
         A = state.x[0]
         B = state.x[1]
@@ -76,16 +81,13 @@ def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
         repress_c_by_b = repressive_hill(B, params.K_B, params.n)
         return jnp.array(
             [
-                params.beta_A0 + params.beta_A1 * repress_a_by_c,
-                params.delta_A * A,
-                params.beta_B0 + params.beta_B1 * repress_b_by_a,
-                params.delta_B * B,
-                params.beta_C0 + params.beta_C1 * repress_c_by_b,
-                params.delta_C * C,
+                params.beta_A0 + params.beta_A1 * repress_a_by_c,  # R0
+                params.delta_A * A,  # R1
+                params.beta_B0 + params.beta_B1 * repress_b_by_a,  # R2
+                params.delta_B * B,  # R3
+                params.beta_C0 + params.beta_C1 * repress_c_by_b,  # R4
+                params.delta_C * C,  # R5
             ]
         )
 
     return f
-
-
-apply_reaction = make_apply_reaction(_STOICH)

@@ -12,31 +12,19 @@ Reactions
     R4:  M       → M + P   at rate  k_tl · M               ν = ( 0,  0, +1)
     R5:  P       → ∅       at rate  δ_P · P                ν = ( 0,  0, -1)
 
-The promoter switching propensities are zero outside ``S ∈ {0, 1}`` by
-construction, so ``S`` is invariant in that set provided the initial
-``S`` count is 0 or 1 (e.g. ``jax.random.bernoulli`` draws).
+Sources
+-------
+* https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1012118
 """
 
 import dataclasses
-from typing import Callable
+from typing import Self
 
 import jax.numpy as jnp
 from jax import Array
 
-from ._common import (
-    State,
-    make_apply_reaction,
-)
-
-SPECIES: tuple[str, ...] = ("S", "M", "P")
-_STOICH: tuple[tuple[int, ...], ...] = (
-    (+1, 0, 0),
-    (-1, 0, 0),
-    (0, +1, 0),
-    (0, -1, 0),
-    (0, 0, +1),
-    (0, 0, -1),
-)
+from ..types import PropensitiesFn, SpeciesNames, State, StoichiometryMatrix
+from ._common import make_apply_reaction
 
 
 @dataclasses.dataclass(frozen=True)
@@ -49,31 +37,40 @@ class Params:
     delta_P: float = 0.2
 
     @classmethod
-    def easy(cls) -> "Params":
+    def easy(cls) -> Self:
         return cls()
 
     @classmethod
-    def hard(cls) -> "Params":
+    def hard(cls) -> Self:
         return cls(k_on=0.2, k_off=0.2, beta=10.0)
 
 
-def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
+SPECIES: SpeciesNames = ("S", "M", "P")
+_STOICHIOMETRY: StoichiometryMatrix = (
+    (+1, 0, 0),  # R0: S=0 → S=1
+    (-1, 0, 0),  # R1: S=1 → S=0
+    (0, +1, 0),  # R2: S=1 → S=1 + M
+    (0, -1, 0),  # R3: M → ∅
+    (0, 0, +1),  # R4: M → M + P
+    (0, 0, -1),  # R5: P → ∅
+)
+apply_reaction = make_apply_reaction(_STOICHIOMETRY)
+
+
+def propensities_fn(params: Params) -> PropensitiesFn:
     def f(state: State, _u: Array) -> Array:
         S = state.x[0]
         M = state.x[1]
         P = state.x[2]
         return jnp.array(
             [
-                params.k_on * (1.0 - S),
-                params.k_off * S,
-                params.beta * S,
-                params.gamma_M * M,
-                params.k_tl * M,
-                params.delta_P * P,
+                params.k_on * (1.0 - S),  # R0
+                params.k_off * S,  # R1
+                params.beta * S,  # R2
+                params.gamma_M * M,  # R3
+                params.k_tl * M,  # R4
+                params.delta_P * P,  # R5
             ]
         )
 
     return f
-
-
-apply_reaction = make_apply_reaction(_STOICH)

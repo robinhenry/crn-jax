@@ -1,40 +1,31 @@
 """Cyclic hybrid ring — three-node mixed-sign feedback loop.
 
 State: three species ``[A, B, C]``. C represses A, A activates B,
-B represses C. Useful for testing mixed-sign feedback and causal
-ambiguity in inference.
+B represses C.
 
 Reactions
 ---------
-    R0:  ∅ → A     at rate  β_A0 + β_A1 · K_C^n_C / (K_C^n_C + C^n_C)    ν = (+1,  0,  0)
-    R1:  A → ∅     at rate  δ_A · A                                       ν = (-1,  0,  0)
-    R2:  ∅ → B     at rate  β_B0 + β_B1 · A^n_A / (K_A^n_A + A^n_A)      ν = ( 0, +1,  0)
-    R3:  B → ∅     at rate  δ_B · B                                       ν = ( 0, -1,  0)
-    R4:  ∅ → C     at rate  β_C0 + β_C1 · K_B^n_B / (K_B^n_B + B^n_B)    ν = ( 0,  0, +1)
-    R5:  C → ∅     at rate  δ_C · C                                       ν = ( 0,  0, -1)
+    R0:  ∅ → A     at rate  β_A0 + β_A1 · K_C^n_C / (K_C^n_C + C^n_C)   ν = (+1,  0,  0)
+    R1:  A → ∅     at rate  δ_A · A                                     ν = (-1,  0,  0)
+    R2:  ∅ → B     at rate  β_B0 + β_B1 · A^n_A / (K_A^n_A + A^n_A)     ν = ( 0, +1,  0)
+    R3:  B → ∅     at rate  δ_B · B                                     ν = ( 0, -1,  0)
+    R4:  ∅ → C     at rate  β_C0 + β_C1 · K_B^n_B / (K_B^n_B + B^n_B)   ν = ( 0,  0, +1)
+    R5:  C → ∅     at rate  δ_C · C                                     ν = ( 0,  0, -1)
+
+Sources
+-------
+* https://www.weizmann.ac.il/mcb/alon/sites/mcb.UriAlon/files/network_motifs_nature_genetics_review.pdf
 """
 
 import dataclasses
-from typing import Callable
+from typing import Self
 
 import jax.numpy as jnp
 from jax import Array
 
 from ..kinetics import hill_function, repressive_hill
-from ._common import (
-    State,
-    make_apply_reaction,
-)
-
-SPECIES: tuple[str, ...] = ("A", "B", "C")
-_STOICH: tuple[tuple[int, ...], ...] = (
-    (+1, 0, 0),
-    (-1, 0, 0),
-    (0, +1, 0),
-    (0, -1, 0),
-    (0, 0, +1),
-    (0, 0, -1),
-)
+from ..types import PropensitiesFn, SpeciesNames, State, StoichiometryMatrix
+from ._common import make_apply_reaction
 
 
 @dataclasses.dataclass(frozen=True)
@@ -56,15 +47,27 @@ class Params:
     delta_C: float = 1.0
 
     @classmethod
-    def easy(cls) -> "Params":
+    def easy(cls) -> Self:
         return cls()
 
     @classmethod
-    def hard(cls) -> "Params":
+    def hard(cls) -> Self:
         return cls(beta_A0=0.01, n_C=2.0, beta_B0=0.01, n_A=2.0, beta_C0=0.01, n_B=2.0)
 
 
-def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
+SPECIES: SpeciesNames = ("A", "B", "C")
+_STOICHIOMETRY: StoichiometryMatrix = (
+    (+1, 0, 0),  # R0: ∅ → A
+    (-1, 0, 0),  # R1: A → ∅
+    (0, +1, 0),  # R2: ∅ → B
+    (0, -1, 0),  # R3: B → ∅
+    (0, 0, +1),  # R4: ∅ → C
+    (0, 0, -1),  # R5: C → ∅
+)
+apply_reaction = make_apply_reaction(_STOICHIOMETRY)
+
+
+def propensities_fn(params: Params) -> PropensitiesFn:
     def f(state: State, _u: Array) -> Array:
         A = state.x[0]
         B = state.x[1]
@@ -74,16 +77,13 @@ def propensities_fn(params: Params) -> Callable[[State, Array], Array]:
         repress_c_by_b = repressive_hill(B, params.K_B, params.n_B)
         return jnp.array(
             [
-                params.beta_A0 + params.beta_A1 * repress_a_by_c,
-                params.delta_A * A,
-                params.beta_B0 + params.beta_B1 * activate_b_by_a,
-                params.delta_B * B,
-                params.beta_C0 + params.beta_C1 * repress_c_by_b,
-                params.delta_C * C,
+                params.beta_A0 + params.beta_A1 * repress_a_by_c,  # R0
+                params.delta_A * A,  # R1
+                params.beta_B0 + params.beta_B1 * activate_b_by_a,  # R2
+                params.delta_B * B,  # R3
+                params.beta_C0 + params.beta_C1 * repress_c_by_b,  # R4
+                params.delta_C * C,  # R5
             ]
         )
 
     return f
-
-
-apply_reaction = make_apply_reaction(_STOICH)

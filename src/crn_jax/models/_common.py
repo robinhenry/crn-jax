@@ -1,24 +1,4 @@
-"""Shared building blocks for the standard GRN models.
-
-Every model module in this package is just the math:
-
-* ``SPECIES`` — tuple of species names.
-* ``_STOICH`` — reaction-by-species stoichiometry matrix.
-* ``Params`` — frozen dataclass with ``easy()`` / ``hard()`` factories.
-* ``propensities_fn(params) -> (state, u) -> Array[M]`` closure factory.
-* ``apply_reaction = make_apply_reaction(_STOICH)``.
-
-The one-call entry point is :func:`sample_trajectories` in this module; it
-takes a model module plus caller-supplied ``x0`` and returns a
-:class:`Dataset`. Default timescale is ``n_steps=1000, dt=0.1`` for every
-model; the caller picks something appropriate per system.
-
-Every model in this library is autonomous: its ``propensities_fn`` takes
-``(state, u)`` only because the Gillespie driver's signature requires it,
-and the ``u`` argument is ignored. :func:`make_vmap_simulator` calls
-:func:`simulate_trajectory` with ``inputs=None`` so the driver skips the
-input-change invalidation it would otherwise perform.
-"""
+"""Shared building blocks for the model modules in :mod:`crn_jax.models`."""
 
 import functools
 from typing import Callable, Protocol
@@ -26,16 +6,14 @@ from typing import Callable, Protocol
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
 from ..gillespie import simulate_trajectory
-from ..types import Dataset, PRNGKey, PropensitiesFn, State
+from ..types import Dataset, PRNGKey, SpeciesNames, State, StoichiometryMatrix
 
 __all__ = [
     "BatchSimulator",
-    "Dataset",
     "ModelModule",
-    "PropensitiesFn",
-    "State",
     "flatten_species",
     "make_apply_reaction",
     "make_vmap_simulator",
@@ -56,16 +34,16 @@ class BatchSimulator(Protocol):
 
     def __call__(
         self,
-        keys: jax.Array,
-        x0_batch: jax.Array,
-        dt: float | jax.Array,
+        keys: Array,
+        x0_batch: Array,
+        dt: float | Array,
     ) -> State: ...
 
 
 def make_vmap_simulator(
     n_steps: int,
-    propensities_fn: Callable[[State, jax.Array], jax.Array],
-    apply_reaction_fn: Callable[[State, jax.Array], State],
+    propensities_fn: Callable[[State, Array], Array],
+    apply_reaction_fn: Callable[[State, Array], State],
 ) -> BatchSimulator:
     """Build a JIT'd vmap'd batch simulator for a fixed model and ``n_steps``.
 
@@ -114,7 +92,9 @@ def make_vmap_simulator(
 # --- Stoichiometry-driven reaction application -------------------------------
 
 
-def make_apply_reaction(stoichiometry: tuple[tuple[int, ...], ...]) -> Callable[[State, jax.Array], State]:
+def make_apply_reaction(
+    stoichiometry: StoichiometryMatrix,
+) -> Callable[[State, Array], State]:
     """Build an ``apply_reaction(state, j)`` from a stoichiometry matrix.
 
     ``stoichiometry`` has one row per reaction and one column per species;
@@ -125,7 +105,7 @@ def make_apply_reaction(stoichiometry: tuple[tuple[int, ...], ...]) -> Callable[
     """
     stoich = jnp.asarray(stoichiometry, dtype=jnp.float32)
 
-    def apply_reaction(state: State, j: jax.Array) -> State:
+    def apply_reaction(state: State, j: Array) -> State:
         return state._replace(x=jnp.maximum(0.0, state.x + stoich[j]))
 
     return apply_reaction
@@ -141,14 +121,14 @@ class ModelModule(Protocol):
     custom user-defined models can too, without subclassing anything.
     """
 
-    SPECIES: tuple[str, ...]
+    SPECIES: SpeciesNames
     Params: type
 
     @staticmethod
-    def propensities_fn(params) -> Callable[[State, jax.Array], jax.Array]: ...
+    def propensities_fn(params) -> Callable[[State, Array], Array]: ...
 
     @staticmethod
-    def apply_reaction(state: State, j: jax.Array) -> State: ...
+    def apply_reaction(state: State, j: Array) -> State: ...
 
 
 def flatten_species(x0: np.ndarray, xs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -197,7 +177,7 @@ def _cached_batch_simulator(
 def sample_trajectories(
     model: ModelModule,
     key: PRNGKey,
-    x0: jax.Array,
+    x0: Array,
     *,
     params=None,
     n_steps: int = 1000,
