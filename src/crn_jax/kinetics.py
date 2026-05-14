@@ -59,15 +59,11 @@ def repressive_hill(
 ) -> Array:
     """Repressive Hill function — ``1 - hill_function(x, K, n)``.
 
-    Formula: ``K**n / (K**n + x**n)``. At ``x == 0`` the output is ``1``;
-    at ``x == K`` it is ``0.5``; for ``x >> K`` it decays toward ``0``.
-    Use this when modelling Hill-type repression so call sites read as
-    ``β · repressive_hill(repressor, K, n)`` rather than
-    ``β · (1 - hill_function(...))``.
+    Formula: ``K**n / (K**n + x**n)``.
 
     Args:
         x: Repressor concentration.
-        K: Half-maximal concentration.
+        K: Half-maximal concentration. At ``x == K``, the output is 0.5.
         n: Hill coefficient.
 
     Returns:

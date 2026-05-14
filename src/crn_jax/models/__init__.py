@@ -60,6 +60,7 @@ the convenience helper isn't enough (custom schedules, per-trajectory dt,
     )
 """
 
+from ..types import Dataset, State  # noqa: F401 — re-exported via __all__
 from . import (
     activator_repressor,
     birth_death,
@@ -76,7 +77,7 @@ from . import (
     toggle,
     two_stage,
 )
-from ._common import Dataset, State, sample_trajectories  # noqa: F401 — re-exported via __all__
+from ._common import sample_trajectories  # noqa: F401 — re-exported via __all__
 
 # Convenience: an ordered tuple of every model module in the library.
 # Useful for iterating ("for m in ALL_MODELS: ...") and for parameter

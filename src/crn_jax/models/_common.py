@@ -21,52 +21,26 @@ input-change invalidation it would otherwise perform.
 """
 
 import functools
-from typing import Callable, NamedTuple, Protocol
+from typing import Callable, Protocol
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 from ..gillespie import simulate_trajectory
-from ..types import PRNGKey
+from ..types import Dataset, PRNGKey, PropensitiesFn, State
 
-# --- State shape -------------------------------------------------------------
-# One State class works for every model: the species count lives in the
-# runtime shape of ``x`` (always a length-``n_species`` 1-D vector),
-# not in the type. ``x[i]`` is the count of the i-th species named in the
-# model's ``SPECIES`` tuple.
-
-
-class State(NamedTuple):
-    """State carried through the Gillespie SSA loop.
-
-    ``x`` is always a 1-D ``(n_species,)`` JAX array, even for single-species
-    models — this keeps :func:`sample_trajectories` uniform across the library.
-    """
-
-    time: jax.Array
-    x: jax.Array
-    next_reaction_time: jax.Array
-
-
-# --- Output shape ------------------------------------------------------------
-
-
-class Dataset(NamedTuple):
-    """Output of every model's :func:`sample_trajectories`.
-
-    All arrays are NumPy (host-side) because downstream usage is
-    bin/analyse, not further JAX work. The per-species trajectory tensor
-    ``xs`` and the flat one-step transition arrays ``X_t`` / ``dX`` make
-    both shapes available without recomputation.
-    """
-
-    times: np.ndarray  # (n_steps,) — sample times in `dt` units
-    species: tuple[str, ...]  # species names, len == n_species
-    x0: np.ndarray  # (n_replicates, n_species) — initial counts supplied by caller
-    xs: np.ndarray  # (n_replicates, n_steps, n_species) — full trajectories
-    X_t: np.ndarray  # (n_replicates * n_steps, n_species) — flat per-step state
-    dX: np.ndarray  # (n_replicates * n_steps, n_species) — flat one-step delta
+__all__ = [
+    "BatchSimulator",
+    "Dataset",
+    "ModelModule",
+    "PropensitiesFn",
+    "State",
+    "flatten_species",
+    "make_apply_reaction",
+    "make_vmap_simulator",
+    "sample_trajectories",
+]
 
 
 # --- vmap-jit simulator factory ---------------------------------------------
