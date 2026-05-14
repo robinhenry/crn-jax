@@ -1,6 +1,8 @@
 """Toggle switch — Gardner-Cantor-Collins mutual-inhibition circuit (2000).
 
-State: two species ``[A, B]``; each represses the other.
+State: two species ``[A, B]``; each represses the other. We use
+A = LacI and B = TetR to map onto the Lugagne 2017 *E. coli* synthetic
+toggle.
 
 Reactions
 ---------
@@ -9,15 +11,46 @@ Reactions
     R2:  ∅ → B     at rate  β_B0 + β_B1 · K_A^n_A / (K_A^n_A + A^n_A)   ν = ( 0, +1)
     R3:  B → ∅     at rate  δ_B · B                                     ν = ( 0, -1)
 
-The easy regime uses the published BIOMD0000000507 parameters
-(``n_B = 2.5`` — non-integer Hill on purpose, matching the BioModels
-source); the hard regime moves closer to the switching boundary.
+Default parameters
+------------------
+Simplified version of the **Lugagne et al. (2017) Nature Communications**
+8-reaction model, originally fitted to single-cell measurements of an *E. coli*
+LacI/TetR toggle. Their mRNA dynamics (5-min half-life) are eliminated
+in favour of an effective protein production rate. The result is the simple
+4-reaction Hill form, with parameters in **arbitrary units (a.u.)** matching the
+fluorescence calibration in the original paper.
+
+    β_A0 = κp_L · κm0_L / g^m_L  =  0.9726 · 0.032 / 0.1386  ≈  0.2246  (basal LacI rate)
+    β_A1 = κp_L · κm_L  / g^m_L  =  0.9726 · 8.30  / 0.1386  ≈  58.23   (max LacI rate)
+    β_B0 = κp_T · κm0_T / g^m_T  =  1.170  · 0.119 / 0.1386  ≈  1.005   (basal TetR rate)
+    β_B1 = κp_T · κm_T  / g^m_T  =  1.170  · 2.06  / 0.1386  ≈  17.39   (max TetR rate)
+    K_A  = θ_LacI  ≈  31.94                                             (LacI repressing-TetR threshold)
+    K_B  = θ_TetR  =  30.00                                             (TetR repressing-LacI threshold)
+    n_A  = η_LacI  =  2                                                 (LacI Hill — dimer)
+    n_B  = η_TetR  =  2                                                 (TetR Hill — dimer)
+    δ_A  = g^p_L   =  0.0165 / min                                      (LacI half-life ≈ 42 min)
+    δ_B  = g^p_T   =  0.0165 / min                                      (TetR half-life ≈ 42 min)
+
+Three deterministic fixed points (asymmetric):
+    "LacI wins" (stable):  A ≈ 660,  B ≈ 63    (a.u.)
+    "TetR wins" (stable):  A ≈ 18,   B ≈ 864   (a.u.)
+    Saddle:                A ≈ 73,   B ≈ 228   (a.u.)
+
+The basins are asymmetric because the leak rates β_A0 ≈ 0.22 and
+β_B0 ≈ 1.0 set non-trivial floor levels of the losing species, which
+then partially repress the winner. The LacI promoter is stronger than
+the TetR promoter, but the larger TetR leak compensates.
+
 
 Sources
 -------
-* https://www.nature.com/articles/35002131
-* https://www.imagwiki.nibib.nih.gov/sites/default/files/jsim/models/biomodels/BIOMD0000000507.mod
-* https://www.omicsdi.org/dataset/biomodels/BIOMD0000000507
+* Lugagne JB, Sosa Carrillo S, Kirch M, Köhler A, Batt G, Hersen P
+  (2017). Balancing a genetic toggle switch by real-time feedback
+  control and periodic forcing. Nature Communications 8:1671 —
+  canonical modern E. coli LacI/TetR toggle with fitted parameters.
+* Gardner TS, Cantor CR, Collins JJ (2000). Construction of a genetic
+  toggle switch in Escherichia coli. Nature 403:339–342 — the original
+  synthetic-biology landmark.
 """
 
 import dataclasses
@@ -33,16 +66,16 @@ from ._common import make_apply_reaction
 
 @dataclasses.dataclass(frozen=True)
 class Params:
-    beta_A0: float = 15.6
-    beta_A1: float = 156.25
-    beta_B0: float = 0.0
-    beta_B1: float = 15.6
-    K_A: float = 2.0015
-    K_B: float = 2.9618e-05
-    n_A: float = 1.0
-    n_B: float = 2.5
-    delta_A: float = 1.0
-    delta_B: float = 1.0
+    beta_A0: float = 0.2246
+    beta_A1: float = 58.23
+    beta_B0: float = 1.005
+    beta_B1: float = 17.39
+    K_A: float = 31.94
+    K_B: float = 30.00
+    n_A: float = 2.0
+    n_B: float = 2.0
+    delta_A: float = 0.0165
+    delta_B: float = 0.0165
 
     @classmethod
     def default(cls) -> Self:

@@ -163,6 +163,7 @@ def plot_species_distributions(
     n_bins: int = 50,
     cmap: str = "viridis",
     colorbar: bool = True,
+    gamma: float = 0.5,
     figsize: tuple[float, float] | None = None,
 ) -> "tuple[Figure, np.ndarray]":
     """Plot the marginal distribution of each species over time, as a heatmap.
@@ -175,6 +176,12 @@ def plot_species_distributions(
     the others (e.g. a delta initial condition vs. a relaxed stationary
     distribution).
 
+    A ``gamma < 1`` power-norm is applied to the colour scale so that
+    low-density bins remain visible alongside very dense ones. This matters
+    for bimodal distributions where the two peaks sit at very different
+    means — under Poisson-like noise σ ∝ √mean, the lower-mean peak is
+    concentrated in fewer bins and dominates a linear colormap.
+
     Args:
         dataset: Output of :func:`sample_trajectories`. Uses ``dataset.times``,
             ``dataset.xs`` (``(N, T, S)``), and ``dataset.species``.
@@ -185,6 +192,11 @@ def plot_species_distributions(
         cmap: Matplotlib colormap name.
         colorbar: If ``True``, attach a colorbar to each species subplot.
             Colour values are fractions of each column's max density (∈ [0, 1]).
+        gamma: Power-norm exponent applied to the colormap. ``gamma = 1``
+            is linear; ``gamma = 0.5`` (default) is sqrt and brightens
+            mid-range densities, which improves readability for bimodal
+            heatmaps where peaks live at very different means. ``gamma >
+            1`` would emphasise the brightest cells further.
         figsize: Figure size when creating new axes. Defaults to
             ``(7, 1.8 * S)``.
 
@@ -248,6 +260,8 @@ def plot_species_distributions(
         col_max = hist.max(axis=0, keepdims=True)
         hist /= np.where(col_max > 0, col_max, 1.0)
 
+        from matplotlib.colors import PowerNorm  # noqa: PLC0415 — lazy optional dep
+
         im = ax.imshow(
             hist,
             aspect="auto",
@@ -255,6 +269,7 @@ def plot_species_distributions(
             extent=[t0, t1, y_lo, y_hi],
             cmap=cmap,
             interpolation="nearest",
+            norm=PowerNorm(gamma=gamma, vmin=0.0, vmax=1.0),
         )
         ax.set_ylabel(name)
         if i == n_species - 1:
