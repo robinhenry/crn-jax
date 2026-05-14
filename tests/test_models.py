@@ -6,7 +6,7 @@ Two classes of checks:
    ``ALL_MODELS``): propensities are finite/non-negative, ``sample_trajectories``
    returns the documented shapes.
 2. **A few behavioural sanity checks**: birth-death steady state,
-   negative-autoreg equilibrium, coherent-FFL pulse-through, toggle bimodality.
+   negative-autoreg equilibrium.
 
 Plus the carried-over BYO and JIT-cache tests.
 """
@@ -112,37 +112,6 @@ def test_negative_autoregulation_steady_state():
     ds = models.sample_trajectories(models.negative_autoregulation, key, x0, params=p, n_steps=2000, dt=0.5)
     mean = float(ds.xs[:, ds.xs.shape[1] // 2 :, 0].mean())
     assert abs(mean - analytic) / max(analytic, 1.0) < 0.15, f"mean={mean}, analytic={analytic}"
-
-
-def test_coherent_ffl_pulse_through():
-    """X(0) above threshold → Z eventually nonzero; X(0) below threshold → Z stays at 0."""
-    p = models.coherent_ffl.Params.default()
-    n_rep = 32
-
-    # X above threshold for all replicates; Y, Z start at 0.
-    x0_on = jnp.stack([jnp.full((n_rep,), 5.0), jnp.zeros((n_rep,)), jnp.zeros((n_rep,))], axis=-1)
-    ds_on = models.sample_trajectories(
-        models.coherent_ffl,
-        jax.random.PRNGKey(0),
-        x0_on,
-        params=p,
-        n_steps=200,
-        dt=0.05,
-    )
-    # X identically zero — below threshold everywhere.
-    x0_off = jnp.zeros((n_rep, 3))
-    ds_off = models.sample_trajectories(
-        models.coherent_ffl,
-        jax.random.PRNGKey(1),
-        x0_off,
-        params=p,
-        n_steps=200,
-        dt=0.05,
-    )
-    z_on_max = float(ds_on.xs[..., 2].max())
-    z_off_max = float(ds_off.xs[..., 2].max())
-    assert z_on_max > 0, "expected coherent-FFL Z to pulse when X starts above threshold"
-    assert z_off_max == 0, f"expected Z to stay at 0 with X≡0, got max={z_off_max}"
 
 
 # --- x0 validation ----------------------------------------------------------

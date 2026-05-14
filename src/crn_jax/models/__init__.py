@@ -5,18 +5,14 @@ factory classmethods), ``propensities_fn``, and ``apply_reaction``.
 """
 
 from . import (
-    activator_repressor,
     birth_death,
-    coherent_ffl,
-    cyclic_ring,
     incoherent_ffl,
     linear_cascade,
-    mutual_activation,
     negative_autoregulation,
     positive_autoregulation,
     repressilator,
     single_gene,
-    toggle,
+    toggle_switch,
 )
 from ._common import sample_trajectories  # noqa: F401 — re-exported via __all__
 
@@ -26,13 +22,9 @@ ALL_MODELS = (
     negative_autoregulation,
     positive_autoregulation,
     linear_cascade,
-    toggle,
-    activator_repressor,
-    mutual_activation,
-    coherent_ffl,
+    toggle_switch,
     incoherent_ffl,
     repressilator,
-    cyclic_ring,
 )
 
 __all__ = sorted(

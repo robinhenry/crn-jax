@@ -1,4 +1,4 @@
-"""Single gene — constitutive transcription and translation, no regulation.
+"""Single gene: constitutive transcription and translation, no regulation.
 
 State: two species ``[R, P]`` (mRNA, protein). Notation follows Thattai &
 van Oudenaarden (2001).
@@ -12,13 +12,18 @@ Reactions
 
 Default parameters
 ------------------
-E. coli base case from Thattai & van Oudenaarden (2001), in units of min⁻¹:
-    k_R  = 0.6                (transcription initiation, 0.01 s⁻¹)
-    γ_R  = ln(2)/2 ≈ 0.347    (mRNA half-life 2 min)
-    k_P  = 20 · γ_R ≈ 6.93    (burst size b = k_P/γ_R = 20)
-    γ_P  = ln(2)/60 ≈ 0.0116  (protein half-life 1 h)
+E. coli base case from Thattai & van Oudenaarden (2001), in min⁻¹.
+Thattai's protein half-life was 1 h (slow-growth E. coli); we use 30 min
+to match fast-growth conditions (typical doubling time).
+Thattai's burst size b = k_P/γ_R = 20 is preserved exactly.
 
-Steady state: ⟨R⟩ ≈ 1.7, ⟨P⟩ ≈ 1030, Fano(P) ≈ 21.
+    k_R  = 0.6                (transcription initiation, 0.01 s⁻¹)
+    γ_R  = ln(2)/2 ≈ 0.347    (mRNA half-life 2 min — fast-growth E. coli)
+    k_P  = 20 · γ_R ≈ 6.93    (burst size b = k_P/γ_R = 20)
+    γ_P  = ln(2)/30 ≈ 0.0231  (protein half-life 30 min — fast-growth E. coli)
+
+Steady state: ⟨R⟩ ≈ 1.7, ⟨P⟩ ≈ 520 (Thattai's 1030 halved by the faster
+protein decay, but still biologically realistic for an E. coli protein).
 
 Sources
 -------
@@ -41,7 +46,7 @@ class Params:
     k_R: float = 0.6
     gamma_R: float = 0.3466
     k_P: float = 6.931
-    gamma_P: float = 0.01155
+    gamma_P: float = 0.02310
 
     @classmethod
     def default(cls) -> Self:

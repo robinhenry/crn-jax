@@ -143,13 +143,9 @@ The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulat
 | `negative_autoregulation` | X      | 2         | Hill-repressed self-feedback                |
 | `positive_autoregulation` | X      | 2         | Hill self-activation (graded; `Params.bistable()` for the bistable regime) |
 | `linear_cascade`       | A, B      | 4         | A → B activation cascade                    |
-| `toggle`               | A, B      | 4         | mutual inhibition (BIOMD0000000507)         |
-| `activator_repressor`  | A, B      | 4         | A → B, B ⊣ A mixed-sign loop                |
-| `mutual_activation`    | A, B      | 4         | A ↔ B positive mutual feedback              |
-| `coherent_ffl`         | X, Y, Z   | 5         | AND-gate FFL with Heaviside thresholds      |
+| `toggle_switch`        | A, B      | 4         | mutual repression (Lugagne 2017 *E. coli*)  |
 | `incoherent_ffl`       | A, B, C   | 6         | adaptive / pulse-generating FFL             |
-| `repressilator`        | A, B, C   | 6         | synthetic oscillator (BIOMD0000000012)      |
-| `cyclic_ring`          | A, B, C   | 6         | three-node mixed-sign feedback ring         |
+| `repressilator`        | A, B, C   | 6         | synthetic oscillator (Elowitz & Leibler 2000) |
 
 ## API
 

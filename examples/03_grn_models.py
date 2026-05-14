@@ -34,14 +34,14 @@ def main() -> None:
         dt=0.1,
     )
 
-    # Toggle switch: BIOMD0000000507 params. Broad IC sampling so some
-    # replicates land in the A-high basin and others in the B-high basin.
-    x0_tog = jax.random.uniform(k_tog_x0, (8, 2), minval=0.0, maxval=200.0)
+    # Toggle switch: Lugagne 2017 E. coli params (adiabatically reduced).
+    # Broad IC sampling so some replicates commit to LacI-wins, others to TetR-wins.
+    x0_tog = jax.random.uniform(k_tog_x0, (8, 2), minval=0.0, maxval=1000.0)
     ds_tog = models.sample_trajectories(
-        models.toggle,
+        models.toggle_switch,
         k_tog,
         x0_tog,
-        params=models.toggle.Params.default(),
+        params=models.toggle_switch.Params.default(),
         n_steps=2000,
         dt=0.05,
     )

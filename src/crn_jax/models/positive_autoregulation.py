@@ -1,4 +1,4 @@
-"""Positive autoregulation — one-node Hill self-activation.
+"""Positive autoregulation: one-node Hill self-activation.
 
 State: one species ``X``.
 
@@ -9,48 +9,56 @@ Reactions
 
 For sub-cooperative Hill (``n ≤ 1``) the equilibrium is monostable and
 graded; cooperativity ``n ≥ 2`` plus appropriate β₀, β₁/δK ratios give a
-**bistable** switch-like regime with two stable fixed points (low / high)
+*bistable* switch-like regime with two stable fixed points (low / high)
 separated by a saddle. Both regimes are the same reaction network — only
-the parameters differ. Use :meth:`Params.default` for the graded case and
-:meth:`Params.bistable` for the bistable regime.
+the parameters differ.
 
-Default parameters (monostable, n=1)
---------------------------------
-Adapted from Alon, Fig 3.5 (n=1 analytical case), rescaled into min⁻¹ via
-δ = ln(2)/60 (matching ``single_gene``'s 60-min protein half-life). Same
-time-unit calibration as ``negative_autoregulation``, but the leak β₀ is
-deliberately set higher than the textbook β₀ = 0 to keep the stochastic
-model from getting trapped at the absorbing state X = 0 (see note below).
-    β₀ = 0.5 · ln(2)/60 ≈ 5.776e-3    (mean wait at X=0 ≈ 173 min)
-    β₁ = 5   · ln(2)/60 ≈ 0.0578
-    K  = 1                            (count)
-    n  = 1                            (Alon's analytical case)
-    δ  = ln(2)/60        ≈ 0.01155    (protein half-life 60 min)
+Use :meth:`Params.default` for the graded case and :meth:`Params.bistable`
+for the bistable regime.
 
-Deterministic steady state ⟨X⟩ ≈ 4.6 (vs Alon's β₀=0 case of 4.0).
-Response time T₁/₂ ~ 2/δ ≈ 173 min — slower than the simple-decay 60 min.
+Default parameters (monostable)
+-------------------------------
+Adapted from Alon, Fig 3.5, rescaled into min⁻¹ with a 30-min protein
+half-life (fast-growth E. coli convention) and scaled up 10× in
+copy-number space so that ⟨X⟩ ≈ 51 sits in the typical E. coli TF range.
+The Hill coefficient is n=2 (TF dimer cooperativity), more biologically
+realistic than Alon's n=1 analytical convenience. The leak β₀ is set to
+5% of β₁ (typical for E. coli promoters, deliberately above Alon's
+β₀ = 0 so the stochastic model doesn't get trapped at X = 0). Alon's
+dimensionless ratio β₁/(δ·K) = 5 is preserved.
+    β₀ = 2.5 · ln(2)/30  ≈ 0.0578     (5% leak; mean wait at X=0 ≈ 17 min)
+    β₁ = 50  · ln(2)/30  ≈ 1.1552
+    K  = 10                           (10× Alon's K = 1; molecule counts)
+    n  = 2                            (TF dimer cooperativity)
+    δ  = ln(2)/30        ≈ 0.02310    (protein half-life 30 min)
+
+Deterministic steady state ⟨X⟩ ≈ 50.7 (slight upward shift from
+Alon-n=1's 46 because n=2 saturates the Hill more sharply at ⟨X⟩ > K).
+Response time still slower than simple-decay 30 min half-life.
 
 Bistable parameters (Params.bistable)
 -------------------------------------
-Taken from the Caltech BE150 / Bi 250b notes (Bois & Elowitz),
-with K and β₁ scaled up 5× from the textbook values to push the high
-state from X ≈ 10 (where it is *metastable* under stochastic dynamics —
-fluctuations cross the saddle and commit to the absorbing X=0) up to
-X ≈ 50 (where the barrier in molecule-count space is wide enough to be
-stochastically persistent). Dimensionless ratios β₁/(δK) = 2.5 and
-n = 4 are preserved exactly.
-    β₀ = 0                          (no basal leak — X=0 is absorbing)
-    β₁ = 50 · ln(2)/60 ≈ 0.5776
-    K  = 20                         (count, 5× textbook 4)
-    n  = 4                          (cooperativity; ≥2 needed for bistability)
-    δ  = ln(2)/60       ≈ 0.01155
-Deterministic fixed points: X = 0 (stable), X_saddle ≈ 17, X_high ≈ 49.
+Taken from the Caltech BE150 / Bi 250b notes (Bois & Elowitz), with K
+and β₁ scaled up 5× to push the high state up to X ≈ 51 (stochastically
+persistent), 30-min protein half-life (fast-growth E. coli), and a 5%
+basal leak (β₀/β₁) so cells in the low basin can recover from X=0 via
+spontaneous expression. Dimensionless ratio β₁/(δK) = 2.5 and n = 4 are
+preserved exactly, β₀/β₁ = 0.05 is a typical E. coli promoter leak.
+    β₀ = 2.5 · ln(2)/30 ≈ 0.0578     (5% leak; mean wait at X=0 ≈ 17 min)
+    β₁ = 50  · ln(2)/30 ≈ 1.1552
+    K  = 20                          (count, 5× textbook 4)
+    n  = 4                           (cooperativity; ≥2 needed for bistability)
+    δ  = ln(2)/30        ≈ 0.02310
 
-Because β₀ = 0, the low fixed point in the stochastic model is exactly
-X = 0 (zero propensity at X=0 — no escape). This is faithful to the
-textbook deterministic treatment: replicates starting below the saddle
-fall to and remain at zero; replicates above commit to the high basin
-and remain there over the simulation horizon.
+Deterministic fixed points: X_low ≈ 2.5 (stable), X_saddle ≈ 15,
+X_high ≈ 51 (stable).
+
+The low basin (X ≈ 2.5) replaces the strict-X=0 absorbing state from
+BE150's β₀=0 case — cells in the low basin fluctuate around ~2.5 rather
+than being permanently stuck. This is more biologically faithful (real
+promoters always leak slightly) and avoids the absorbing-state
+issue under stochastic dynamics. Cells that fluctuate to X=0
+recover in ~17 min (well under the 30-min half-life).
 
 Sources
 -------
@@ -74,11 +82,11 @@ from ._common import make_apply_reaction
 
 @dataclasses.dataclass(frozen=True)
 class Params:
-    beta_0: float = 0.005776
-    beta_1: float = 0.05776
-    K: float = 1.0
-    n: float = 1.0
-    delta: float = 0.01155
+    beta_0: float = 0.0578
+    beta_1: float = 1.1552
+    K: float = 10.0
+    n: float = 2.0
+    delta: float = 0.02310
 
     @classmethod
     def default(cls) -> Self:
@@ -86,19 +94,12 @@ class Params:
 
     @classmethod
     def bistable(cls) -> Self:
-        """Bistable regime — BE150 ratios (Bois & Elowitz, Caltech), with K
-        and β₁ scaled up 5× to give a stochastically-persistent high state
-        at X ≈ 50 (rather than X ≈ 10, where the saddle is too close in
-        count space and the high state escapes to the absorbing X=0).
-        Three deterministic fixed points: X=0 (stable, absorbing),
-        X_saddle ≈ 17, X_high ≈ 49.
-        """
         return cls(
-            beta_0=0.0,
-            beta_1=0.5776,  # = 50 · ln(2)/60
+            beta_0=0.0578,  # = 2.5 · ln(2)/30; 5% leak, mean wait at X=0 ≈ 17 min
+            beta_1=1.1552,  # = 50 · ln(2)/30
             K=20.0,
             n=4.0,
-            delta=0.01155,
+            delta=0.02310,
         )
 
 

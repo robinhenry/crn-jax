@@ -1,8 +1,7 @@
-"""Toggle switch — Gardner-Cantor-Collins mutual-inhibition circuit (2000).
+"""Toggle switch: Gardner-Cantor-Collins mutual-inhibition circuit (2000).
 
-State: two species ``[A, B]``; each represses the other. We use
-A = LacI and B = TetR to map onto the Lugagne 2017 *E. coli* synthetic
-toggle.
+State: two species ``[A, B]``, each represses the other.
+We use A = LacI and B = TetR to match the Lugagne 2017 *E. coli* synthetic toggle.
 
 Reactions
 ---------
@@ -13,9 +12,9 @@ Reactions
 
 Default parameters
 ------------------
-Simplified version of the **Lugagne et al. (2017) Nature Communications**
+Simplified version of the *Lugagne et al. (2017) Nature Communications*
 8-reaction model, originally fitted to single-cell measurements of an *E. coli*
-LacI/TetR toggle. Their mRNA dynamics (5-min half-life) are eliminated
+LacI/TetR toggle. Their mRNA dynamics (5-min half-life) are ignored
 in favour of an effective protein production rate. The result is the simple
 4-reaction Hill form, with parameters in **arbitrary units (a.u.)** matching the
 fluorescence calibration in the original paper.

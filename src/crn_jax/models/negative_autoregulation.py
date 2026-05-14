@@ -1,4 +1,4 @@
-"""Negative autoregulation — one-node Hill-repressed self-feedback.
+"""Negative autoregulation: one-node Hill-repressed self-feedback.
 
 State: one species ``X``.
 
@@ -12,19 +12,24 @@ The deterministic equilibrium is the root of
 
 Default parameters
 ------------------
-Canonical textbook case from Alon, Fig 3.3, rescaled into min⁻¹.
-Alon's dimensionless `δ = 1` is scaled by setting `δ = ln(2)/60 ≈ 0.01155 min⁻¹`
-(the 60-min protein half-life used by Thattai & van Oudenaarden for E. coli);
-β₁ is rescaled by the same factor.
-K is a count and n is dimensionless, so both are unchanged.
+Canonical textbook case from Alon, Fig 3.3, rescaled into min⁻¹ with a
+30-min protein half-life (fast-growth E. coli convention) and scaled up
+10× in copy-number space to put ⟨X⟩ in the realistic E. coli TF range.
+The dimensionless ratio β₁ / (δ · K) = 5 is preserved from Alon's
+analysis. The Hill coefficient is n=2 (TF dimer binding), more
+biologically realistic than Alon's n=1 analytical convenience.
+Qualitatively, the speed-up result holds for any n ≥ 1.
     β₀ = 0
-    β₁ = 5 · ln(2)/60 ≈ 0.0578   (Alon's β = 5 in dimensionless units)
-    K  = 1                       (count)
-    n  = 1                       (Alon's analytical case)
-    δ  = ln(2)/60 ≈ 0.01155       (protein half-life 60 min)
+    β₁ = 50 · ln(2)/30 ≈ 1.1552   (10× Alon's dimensionless β = 5)
+    K  = 10                       (10× Alon's K = 1; in molecule counts)
+    n  = 2                        (TF dimer cooperativity)
+    δ  = ln(2)/30      ≈ 0.02310  (protein half-life 30 min)
 
-Steady state ⟨X⟩ = (−1 + √21) / 2 ≈ 1.79 (depends only on β₁/δ = 5 and K).
-Response time T₁/₂ ≈ ln(2)/(2δ) ≈ 30 min — half the simple-decay response.
+Steady state ⟨X⟩ ≈ 15.2 (solve β₁/δ · K^n/(K^n + X^n) = X numerically;
+≈ 17.9 for n=1, smaller for n=2 because the Hill saturates earlier).
+
+Response time speeds up faster than n=1; the qualitative result that
+"NAR is ~5–7× faster than simple decay" still holds.
 
 Sources
 -------
@@ -46,10 +51,10 @@ from ._common import make_apply_reaction
 @dataclasses.dataclass(frozen=True)
 class Params:
     beta_0: float = 0.0
-    beta_1: float = 0.05776
-    K: float = 1.0
-    n: float = 1.0
-    delta: float = 0.01155
+    beta_1: float = 1.1552
+    K: float = 10.0
+    n: float = 2.0
+    delta: float = 0.02310
 
     @classmethod
     def default(cls) -> Self:
