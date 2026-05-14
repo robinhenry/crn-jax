@@ -13,7 +13,7 @@ from . import (
     incoherent_ffl,
     linear_chain,
     mutual_activation,
-    negative_autoreg,
+    negative_autoregulation,
     positive_autoreg,
     repressilator,
     single_gene,
@@ -24,7 +24,7 @@ from ._common import sample_trajectories  # noqa: F401 — re-exported via __all
 ALL_MODELS = (
     birth_death,
     single_gene,
-    negative_autoreg,
+    negative_autoregulation,
     positive_autoreg,
     bistable,
     linear_chain,

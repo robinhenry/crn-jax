@@ -90,9 +90,9 @@ def test_birth_death_steady_state():
     assert abs(mean - analytic) / analytic < 0.10, f"mean={mean}, analytic={analytic}"
 
 
-def test_negative_autoreg_steady_state():
+def test_negative_autoregulation_steady_state():
     """Late-time ⟨X⟩ matches the numerically-solved equilibrium."""
-    p = models.negative_autoreg.Params.default()
+    p = models.negative_autoregulation.Params.default()
 
     def f(X):
         return p.beta_0 + p.beta_1 * (p.K**p.n) / (p.K**p.n + X**p.n) - p.delta * X
@@ -109,7 +109,7 @@ def test_negative_autoreg_steady_state():
     n_rep = 128
     key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
     x0 = jax.random.uniform(k_x0, (n_rep, 1), minval=0.0, maxval=10.0)
-    ds = models.sample_trajectories(models.negative_autoreg, key, x0, params=p, n_steps=2000, dt=0.05)
+    ds = models.sample_trajectories(models.negative_autoregulation, key, x0, params=p, n_steps=2000, dt=0.5)
     mean = float(ds.xs[:, ds.xs.shape[1] // 2 :, 0].mean())
     assert abs(mean - analytic) / max(analytic, 1.0) < 0.15, f"mean={mean}, analytic={analytic}"
 
@@ -122,12 +122,22 @@ def test_coherent_ffl_pulse_through():
     # X above threshold for all replicates; Y, Z start at 0.
     x0_on = jnp.stack([jnp.full((n_rep,), 5.0), jnp.zeros((n_rep,)), jnp.zeros((n_rep,))], axis=-1)
     ds_on = models.sample_trajectories(
-        models.coherent_ffl, jax.random.PRNGKey(0), x0_on, params=p, n_steps=200, dt=0.05
+        models.coherent_ffl,
+        jax.random.PRNGKey(0),
+        x0_on,
+        params=p,
+        n_steps=200,
+        dt=0.05,
     )
     # X identically zero — below threshold everywhere.
     x0_off = jnp.zeros((n_rep, 3))
     ds_off = models.sample_trajectories(
-        models.coherent_ffl, jax.random.PRNGKey(1), x0_off, params=p, n_steps=200, dt=0.05
+        models.coherent_ffl,
+        jax.random.PRNGKey(1),
+        x0_off,
+        params=p,
+        n_steps=200,
+        dt=0.05,
     )
     z_on_max = float(ds_on.xs[..., 2].max())
     z_off_max = float(ds_off.xs[..., 2].max())
@@ -158,7 +168,7 @@ def test_sample_trajectories_rejects_negative_x0():
 def test_byo_path_compatible_with_simulate_trajectory():
     """A model's State + propensities_fn + apply_reaction should plug
     straight into simulate_trajectory."""
-    from crn_jax import simulate_trajectory
+    from crn_jax.gillespie import simulate_trajectory
 
     p = models.birth_death.Params()
     state0 = models.birth_death.State(
