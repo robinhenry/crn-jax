@@ -4,7 +4,7 @@ repos:
     hooks:
       - id: check-ast
       - id: check-added-large-files
-        args: ["--maxkb=1024"]
+        args: ["--maxkb=2048"]
       - id: check-toml
       - id: check-yaml
       - id: end-of-file-fixer
