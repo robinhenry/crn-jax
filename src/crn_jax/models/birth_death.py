@@ -8,10 +8,6 @@ Reactions
     R1:  X → ∅     at rate  δ · X            ν = (-1,)
 
 Stationary distribution is Poisson with mean ``⟨X⟩ = α / δ``.
-
-Sources
--------
-* https://www.sciencedirect.com/science/article/pii/S0092867408012439
 """
 
 import dataclasses
@@ -30,12 +26,8 @@ class Params:
     delta: float = 1.0
 
     @classmethod
-    def easy(cls) -> Self:
+    def default(cls) -> Self:
         return cls()
-
-    @classmethod
-    def hard(cls) -> Self:
-        return cls(alpha=1.0)
 
 
 SPECIES: SpeciesNames = ("X",)

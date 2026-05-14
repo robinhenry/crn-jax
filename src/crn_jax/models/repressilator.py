@@ -51,12 +51,8 @@ class Params:
     delta_C: float = 0.347
 
     @classmethod
-    def easy(cls) -> Self:
+    def default(cls) -> Self:
         return cls()
-
-    @classmethod
-    def hard(cls) -> Self:
-        return cls(beta_A1=20.0, beta_B1=20.0, beta_C1=20.0, n=1.5)
 
 
 SPECIES: SpeciesNames = ("A", "B", "C")

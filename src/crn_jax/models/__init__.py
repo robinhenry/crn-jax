@@ -16,16 +16,14 @@ from . import (
     negative_autoreg,
     positive_autoreg,
     repressilator,
-    telegraph,
+    single_gene,
     toggle,
-    two_stage,
 )
 from ._common import sample_trajectories  # noqa: F401 — re-exported via __all__
 
 ALL_MODELS = (
     birth_death,
-    two_stage,
-    telegraph,
+    single_gene,
     negative_autoreg,
     positive_autoreg,
     bistable,

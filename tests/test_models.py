@@ -4,8 +4,7 @@ Two classes of checks:
 
 1. **Per-model smoke tests** (parametrised over every module in
    ``ALL_MODELS``): propensities are finite/non-negative, ``sample_trajectories``
-   returns the documented shapes, ``Params.easy()`` and ``Params.hard()`` are
-   distinct.
+   returns the documented shapes.
 2. **A few behavioural sanity checks**: birth-death steady state,
    negative-autoreg equilibrium, coherent-FFL pulse-through, toggle bimodality.
 
@@ -69,18 +68,12 @@ def test_sample_trajectories_shapes(module):
     assert ds.dX.dtype == np.float32
 
 
-@parametrize_models
-def test_easy_and_hard_params_differ(module):
-    """Every model in the library has distinct easy / hard regimes."""
-    assert module.Params.easy() != module.Params.hard()
-
-
 # --- Behavioural sanity checks ----------------------------------------------
 
 
 def test_birth_death_steady_state():
-    """``⟨X⟩ → α/δ`` at steady state under the easy regime."""
-    p = models.birth_death.Params.easy()
+    """``⟨X⟩ → α/δ`` at steady state under default params."""
+    p = models.birth_death.Params.default()
     n_rep = 128
     x0 = jnp.full((n_rep, 1), p.alpha / p.delta)
     ds = models.sample_trajectories(
@@ -99,7 +92,7 @@ def test_birth_death_steady_state():
 
 def test_negative_autoreg_steady_state():
     """Late-time ⟨X⟩ matches the numerically-solved equilibrium."""
-    p = models.negative_autoreg.Params.easy()
+    p = models.negative_autoreg.Params.default()
 
     def f(X):
         return p.beta_0 + p.beta_1 * (p.K**p.n) / (p.K**p.n + X**p.n) - p.delta * X
@@ -123,7 +116,7 @@ def test_negative_autoreg_steady_state():
 
 def test_coherent_ffl_pulse_through():
     """X(0) above threshold → Z eventually nonzero; X(0) below threshold → Z stays at 0."""
-    p = models.coherent_ffl.Params.easy()
+    p = models.coherent_ffl.Params.default()
     n_rep = 32
 
     # X above threshold for all replicates; Y, Z start at 0.
@@ -140,20 +133,6 @@ def test_coherent_ffl_pulse_through():
     z_off_max = float(ds_off.xs[..., 2].max())
     assert z_on_max > 0, "expected coherent-FFL Z to pulse when X starts above threshold"
     assert z_off_max == 0, f"expected Z to stay at 0 with X≡0, got max={z_off_max}"
-
-
-def test_telegraph_promoter_stays_binary():
-    """The promoter state S must remain in {0, 1} for the duration."""
-    n_rep = 32
-    key, k_s, k_m, k_p = jax.random.split(jax.random.PRNGKey(0), 4)
-    s0 = jax.random.bernoulli(k_s, 0.5, (n_rep,)).astype(jnp.float32)
-    m0 = jax.random.uniform(k_m, (n_rep,), minval=0.0, maxval=5.0)
-    p0 = jax.random.uniform(k_p, (n_rep,), minval=0.0, maxval=150.0)
-    x0 = jnp.stack([s0, m0, p0], axis=-1)
-    ds = models.sample_trajectories(models.telegraph, key, x0, n_steps=300)
-    s = ds.xs[..., 0]
-    unique = np.unique(s)
-    assert set(unique.tolist()).issubset({0.0, 1.0}), f"S left {{0,1}}: unique values {unique}"
 
 
 # --- x0 validation ----------------------------------------------------------

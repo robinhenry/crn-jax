@@ -42,6 +42,7 @@ pre-commit = "^4.1.0"
 matplotlib = "^3.10"
 numpy = "^2.0"
 black = "^26.3.1"
+ipykernel = "^7.2.0"
 
 [tool.poetry.group.gpu]
 optional = true

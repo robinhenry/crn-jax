@@ -22,14 +22,14 @@ def main() -> None:
     key = jax.random.PRNGKey(0)
     k_rep, k_rep_x0, k_tog, k_tog_x0 = jax.random.split(key, 4)
 
-    # Repressilator: easy regime → sustained oscillation (n=2, β₁=29.97).
+    # Repressilator: default params → sustained oscillation (n=2, β₁=29.97).
     # ICs span 0–100 across the three nodes so initial phase is varied.
     x0_rep = jax.random.uniform(k_rep_x0, (3, 3), minval=0.0, maxval=100.0)
     ds_rep = models.sample_trajectories(
         models.repressilator,
         k_rep,
         x0_rep,
-        params=models.repressilator.Params.easy(),
+        params=models.repressilator.Params.default(),
         n_steps=2000,
         dt=0.1,
     )
@@ -41,7 +41,7 @@ def main() -> None:
         models.toggle,
         k_tog,
         x0_tog,
-        params=models.toggle.Params.easy(),
+        params=models.toggle.Params.default(),
         n_steps=2000,
         dt=0.05,
     )

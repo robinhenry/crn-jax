@@ -35,12 +35,8 @@ class Params:
     Tz: float = 0.5
 
     @classmethod
-    def easy(cls) -> Self:
+    def default(cls) -> Self:
         return cls()
-
-    @classmethod
-    def hard(cls) -> Self:
-        return cls(Ty=0.7, Tz=0.3)
 
 
 SPECIES: SpeciesNames = ("X", "Y", "Z")

@@ -139,8 +139,7 @@ The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulat
 | model                  | species   | reactions | shape                                       |
 | ---------------------- | --------- | --------- | ------------------------------------------- |
 | `birth_death`          | X         | 2         | minimal one-species baseline                |
-| `two_stage`            | M, P      | 4         | transcription-translation w/ hidden mRNA    |
-| `telegraph`            | S, M, P   | 6         | bursting two-state promoter                 |
+| `single_gene`          | R, P      | 4         | constitutive transcription-translation      |
 | `negative_autoreg`     | X         | 2         | Hill-repressed self-feedback                |
 | `positive_autoreg`     | X         | 2         | Hill self-activation                        |
 | `bistable`             | X         | 2         | self-activation in the bistable regime      |
