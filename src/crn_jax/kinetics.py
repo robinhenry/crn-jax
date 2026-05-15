@@ -50,3 +50,25 @@ def hill_function(
     x_powered = jnp.power(x, n)
     K_powered = jnp.power(K, n)
     return x_powered / (K_powered + x_powered)
+
+
+def repressive_hill(
+    x: Array,
+    K: float | Array,
+    n: float | Array,
+) -> Array:
+    """Repressive Hill function — ``1 - hill_function(x, K, n)``.
+
+    Formula: ``K**n / (K**n + x**n)``.
+
+    Args:
+        x: Repressor concentration.
+        K: Half-maximal concentration. At ``x == K``, the output is 0.5.
+        n: Hill coefficient.
+
+    Returns:
+        Repressive Hill value in ``[0, 1]``.
+    """
+    x_powered = jnp.power(x, n)
+    K_powered = jnp.power(K, n)
+    return K_powered / (K_powered + x_powered)

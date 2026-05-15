@@ -52,7 +52,7 @@ poetry install --with gpu         # add jax[cuda12] on an NVIDIA host
 - 🚀 **GPU speedup** — 1M+ independent trajectories on a single GPU under `jax.vmap`, with no Python overhead.
 - ⏱️ **Discretization-safe** — pending reaction times are preserved across simulation-interval boundaries, so trajectories are physically correct under discrete observations (or fixed-interval stepping).
 - 🎛️ **Control-input aware** — propensities take an optional `input` argument that can vary per-interval and per-replicate, so each of N parallel trajectories can follow its own control schedule (useful for RL-style rollouts, closed-loop experiments with per-replicate inputs, …).
-- 🎨 **Pre-built motifs** - a series of standard motifs implemented for convenience.
+- 🎨 **Pre-built models** - a library of canonical GRN systems (oscillators, switches, FFLs, …) with easy/hard parameter regimes.
 - 🧩 **Bring-your-own state** — the loop operates on any PyTree (NamedTuple, Flax struct dataclass, Equinox module, …).
 
 
@@ -105,28 +105,48 @@ times = jnp.arange(1, 201) * 1.0
 
 See the [examples](examples/) folder for more detailed examples.
 
-## Standard motifs
+## Pre-built models
 
-`crn_jax.motifs` provides pre-built canonical reaction networks. Each motif exports a uniform surface: `State`, `Params`, `propensities_fn()`, `apply_reaction()`, plus a one-call `simulate_dataset()`, so generating time series from different systems is a one-line change:
+`crn_jax.models` provides a library of canonical GRN reaction networks taken from the literature (see [`library.json`](src/crn_jax/models/library.json) for the full list and parameter sources). Each model module exposes the same surface — `SPECIES`, `Params` with `.easy()` / `.hard()` factory methods, `propensities_fn()`, `apply_reaction()` — and the one-call entry point lives at the package level. Swapping systems in benchmarks is a one-argument change:
 
 ```python
-import jax
-from crn_jax.motifs import cascade
+import jax, jax.numpy as jnp
+from crn_jax import models
 
-ds = cascade.simulate_dataset(jax.random.PRNGKey(0))
+# x0 is required and always (n_replicates, n_species): the library does not
+# sample initial conditions for you because the sensible IC is problem-specific.
+n_rep = 32
+key, k_x0 = jax.random.split(jax.random.PRNGKey(0))
+x0 = jax.random.uniform(k_x0, (n_rep, len(models.repressilator.SPECIES)),
+                        minval=0.0, maxval=100.0)
 
-# Access X, Y, u, dX, dY observations
-ds.X_t, ds.Y_t, ds.u_per_triple, ds.dX, ds.dY
+ds = models.sample_trajectories(models.repressilator, key, x0, n_steps=2000, dt=0.1)
+
+# Every Dataset has the same shape.
+ds.species    # ("A", "B", "C")
+ds.xs         # (n_replicates, n_steps, n_species) — full trajectories
+ds.X_t, ds.dX # (n_replicates * n_steps, n_species) — flat one-step transitions
+
+# Switch regime by passing different Params.
+ds_hard = models.sample_trajectories(
+    models.repressilator, key, x0, params=models.repressilator.Params.hard(),
+    n_steps=2000, dt=0.1,
+)
 ```
 
-The primitive functions (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper `simulate_dataset` isn't enough (e.g., if you need custom `u` schedules, specific initial condition mixtures, etc.).
+The primitives (`propensities_fn()`, `apply_reaction()`) also plug into `simulate_trajectory` directly when the convenience helper isn't enough (custom schedules, per-trajectory dt, …).
 
-| motif        | reactions | input | shape                                      |
-| ------------ | --------- | ----- | ------------------------------------------ |
-| `inducible`  | 2         | yes   | Hill-modulated birth-death                 |
-| `autoreg`    | 2         | no    | negative autoregulation (Hill repressor)   |
-| `cascade`    | 4         | yes   | u → X → Y two-stage cascade                |
-| `ffl_and`    | 6         | yes   | C1 feed-forward loop with AND output gate  |
+| model                  | species   | reactions | shape                                       |
+| ---------------------- | --------- | --------- | ------------------------------------------- |
+| `birth_death`          | X         | 2         | minimal one-species baseline                |
+| `single_gene`          | R, P      | 4         | constitutive transcription-translation      |
+| `negative_autoregulation` | X      | 2         | Hill-repressed self-feedback                |
+| `positive_autoregulation` | X      | 2         | Hill self-activation (graded; `Params.bistable()` for the bistable regime) |
+| `linear_cascade`       | A, B      | 4         | A → B activation cascade                    |
+| `toggle_switch`        | A, B      | 4         | mutual repression (Lugagne 2017 *E. coli*)  |
+| `incoherent_ffl`       | A, B, C   | 6         | adaptive / pulse-generating FFL             |
+| `repressilator`        | A, B, C   | 6         | synthetic oscillator (Elowitz & Leibler 2000) |
+| `cca_optogenetic`      | R, P      | 4         | light-driven gene expression (CcaS/CcaR, Tabor lab) — **input-driven** |
 
 ## API
 

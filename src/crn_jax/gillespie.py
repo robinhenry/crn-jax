@@ -63,8 +63,6 @@ If your state shape is different, call :func:`simulate_until` directly
 with custom ``get_time_fn`` / ``update_time_fn`` lambdas.
 """
 
-from __future__ import annotations
-
 from typing import Any, Callable
 
 import jax
